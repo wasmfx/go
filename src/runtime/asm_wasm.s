@@ -56,6 +56,19 @@ TEXT runtime·gogo(SB), NOSPLIT, $0-8
 	MOVD $0, gobuf_sp(R0)
 	MOVD $0, gobuf_ctxt(R0)
 
+	// Argh: The first time through gogo, it's called outside of the context of
+	// wasm_pc_f_loop, and we can't suspend. So fall through with the old
+	// method. Use RET3 as a kludgy global to track whether we're in the first
+	// call or a subsequent one.
+	Get RET3
+	I64Eqz
+	If
+		I64Const 1
+		Set RET3
+	Else
+		ASuspend 0   // tag 0, i.e. "yield"
+	End
+
 	I32Const $1
 	Return
 
@@ -523,19 +536,14 @@ TEXT wasm_pc_f_loop(SB),NOSPLIT,$0
 	If
 	loop:
 		Loop
-			// Get PC_B & PC_F from -8(SP)
-			Get SP
-			I32Const $8
-			I32Sub
-			I32Load16U $0 // PC_B
-
-			Get SP
-			I32Const $8
-			I32Sub
-			I32Load $2 // PC_F
-
-			CallIndirect $0
-			Drop
+			// This block provides a target for the resume-handler to jump to.
+			Block 114  // 0x80 - (index of type of continuations = 14)
+				ARefFunc wasm_pc_f_loop1(SB)
+				AContNew 5
+				AResume  // Args to resume are hard-coded in writeOpcode in wasmobj.go
+				ARefNull // Push a null continuation reference as a dummy to feed the "Drop" below, when we are falling through here.
+			End
+			Drop  // consume the continuation that was passed when jumping to the resume-handler
 
 			Get PAUSE
 			I32Eqz
@@ -545,6 +553,30 @@ TEXT wasm_pc_f_loop(SB),NOSPLIT,$0
 
 	I32Const $0
 	Set PAUSE
+
+	Return
+
+// wasm_pc_f_loop1 is the target for resume to invoke each time it is called.
+// This is a factoring that I have come up with, not necessarily a good way
+// to split responsibilities around the wasm_pc_f_loop.
+//
+// This routine has the responsibility of setting up the context and calling
+// the desired function. In a mature implementation, we'd probably have resume
+// invoke a desired continuation directly.
+TEXT wasm_pc_f_loop1(SB),NOSPLIT,$0
+	// Get PC_B & PC_F from -8(SP)
+	Get SP
+	I32Const $8
+	I32Sub
+	I32Load16U $0 // PC_B
+
+	Get SP
+	I32Const $8
+	I32Sub
+	I32Load $2 // PC_F
+
+	CallIndirect $0
+	Drop
 
 	Return
 

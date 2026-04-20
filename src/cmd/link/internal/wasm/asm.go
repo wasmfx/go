@@ -33,6 +33,7 @@ const (
 	sectionFunction = 3
 	sectionTable    = 4
 	sectionMemory   = 5
+	sectionTag      = 13
 	sectionGlobal   = 6
 	sectionExport   = 7
 	sectionStart    = 8
@@ -74,6 +75,7 @@ var wasmFuncTypes = map[string]*wasmFuncType{
 	"wasm_export_resume":      {Params: []byte{}},                                         //
 	"wasm_export_getsp":       {Results: []byte{I32}},                                     // sp
 	"wasm_pc_f_loop":          {Params: []byte{}},                                         //
+	"wasm_pc_f_loop1":         {Params: []byte{}},                                         //
 	"wasm_pc_f_loop_export":   {Params: []byte{I32}},                                      // pc_f
 	"runtime.wasmDiv":         {Params: []byte{I64, I64}, Results: []byte{I64}},           // x, y -> x/y
 	"runtime.wasmTruncS":      {Params: []byte{F64}, Results: []byte{I64}},                // x -> int(x)
@@ -250,6 +252,7 @@ func asmb2(ctxt *ld.Link, ldr *loader.Loader) {
 	writeFunctionSec(ctxt, fns)
 	writeTableSec(ctxt, fns)
 	writeMemorySec(ctxt, ldr)
+	writeTagSec(ctxt)
 	writeGlobalSec(ctxt)
 	writeExportSec(ctxt, ldr, len(hostImports))
 	writeElementSec(ctxt, uint64(len(hostImports)), uint64(len(fns)))
@@ -297,7 +300,7 @@ func writeBuildID(ctxt *ld.Link, buildid []byte) {
 func writeTypeSec(ctxt *ld.Link, types []*wasmFuncType) {
 	sizeOffset := writeSecHeader(ctxt, sectionType)
 
-	writeUleb128(ctxt.Out, uint64(len(types)))
+	writeUleb128(ctxt.Out, uint64(len(types) + 2))  // hard-coding two extra types at the bottom.
 
 	for _, t := range types {
 		ctxt.Out.WriteByte(0x60) // functype
@@ -310,6 +313,22 @@ func writeTypeSec(ctxt *ld.Link, types []*wasmFuncType) {
 			ctxt.Out.WriteByte(v)
 		}
 	}
+
+	// In the example program, this will be index 13.
+	// HACKHACKHACK hard-coding the function and continuation types that we need.
+	ctxt.Out.WriteByte(0x5d)   // General tag for a continuation type
+	writeUleb128(ctxt.Out, 11)  // Index of the function type of the continuation type. HACKHACKHACK
+	// Useful func types: as observed in the executable, type index 0 happens to be i32 -> i32, 11 is [] -> []
+
+	// In the example program, this will be index 14.
+	// It is the encoding of [] -> [(ref null 0x0d)]
+	//
+	// Function type
+	ctxt.Out.WriteByte(0x60)
+	ctxt.Out.WriteByte(0x00)  // zero parameters
+	ctxt.Out.WriteByte(0x01)  // one result
+	ctxt.Out.WriteByte(0x63)  // ref nullable
+	ctxt.Out.WriteByte(0x0d)  // our continuation type created above, index 13.
 
 	writeSecSize(ctxt, sizeOffset)
 }
@@ -375,6 +394,18 @@ func writeMemorySec(ctxt *ld.Link, ldr *loader.Loader) {
 	writeUleb128(ctxt.Out, 1)                        // number of memories
 	ctxt.Out.WriteByte(0x00)                         // no maximum memory size
 	writeUleb128(ctxt.Out, initialSize/wasmPageSize) // minimum (initial) memory size
+
+	writeSecSize(ctxt, sizeOffset)
+}
+
+// writeTagSec writes the section that declares effect tags. Currently there is only a single tag,
+// used to implement goroutines with stack-switching instructions (suspend/resume).
+func writeTagSec(ctxt *ld.Link) {
+	sizeOffset := writeSecHeader(ctxt, sectionTag)
+
+	writeUleb128(ctxt.Out, 1)                        // number of tags
+	ctxt.Out.WriteByte(0x00)                         // A tag we will call $yield, index 0
+	ctxt.Out.WriteByte(0x0b)                         //    the tag's function type
 
 	writeSecSize(ctxt, sizeOffset)
 }

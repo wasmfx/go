@@ -113,6 +113,7 @@ var unaryDst = map[obj.As]bool{
 	AI64Store8:    true,
 	AI64Store16:   true,
 	AI64Store32:   true,
+	ASuspend:      true,
 	ACALLNORESUME: true,
 }
 
@@ -1070,7 +1071,8 @@ func assemble(ctxt *obj.Link, s *obj.LSym, newprog obj.ProgAlloc) {
 	switch s.Name {
 	case "_rt0_wasm_js", "_rt0_wasm_wasip1", "_rt0_wasm_wasip1_lib",
 		"wasm_export_run", "wasm_export_resume", "wasm_export_getsp",
-		"wasm_pc_f_loop", "runtime.wasmDiv", "runtime.wasmTruncS", "runtime.wasmTruncU", "memeqbody":
+		"wasm_pc_f_loop",
+		"wasm_pc_f_loop1", "runtime.wasmDiv", "runtime.wasmTruncS", "runtime.wasmTruncU", "memeqbody":
 		varDecls = []*varDecl{}
 		useAssemblyRegMap()
 	case "wasm_pc_f_loop_export":
@@ -1254,6 +1256,24 @@ func assemble(ctxt *obj.Link, s *obj.LSym, newprog obj.ProgAlloc) {
 				writeUleb128(w, idx)
 			}
 
+		case ARefFunc:
+			// This instruction looks like ACall but instead of jumping to the function,
+			// it leaves a reference to it on the stack.
+			// Impl here is a hacky clone of ACall that uses From instead of To.
+			if p.From.Name != obj.NAME_EXTERN && p.From.Name != obj.NAME_STATIC {
+				panic("bad name for RefFunc")
+			}
+			typ := objabi.R_CALL
+			if p.Mark&WasmImport != 0 {
+				typ = objabi.R_WASMIMPORT
+			}
+			s.AddRel(ctxt, obj.Reloc{
+				Type: typ,
+				Off:  int32(w.Len()),
+				Siz:  1, // actually variable sized
+				Sym:  p.From.Sym,
+			})
+
 		case ACall:
 			switch p.To.Type {
 			case obj.TYPE_CONST:
@@ -1340,10 +1360,35 @@ func assemble(ctxt *obj.Link, s *obj.LSym, newprog obj.ProgAlloc) {
 		case ACurrentMemory, AGrowMemory, AMemoryFill:
 			w.WriteByte(0x00)
 
+		case ARefNull:
+			// HACKHACKHACK. Several of these instructions need to encode a type
+			// index for a function or continuation reference type. Since the
+			// WasmFX prototype only uses these instructions in one place, I can
+			// hard-code the type, and I also know what index the type is at for
+			// my example test program. This is of course fragile.
+			w.WriteByte(0x0d)
+
+		case AContNew:
+			w.WriteByte(0x0d)  // HACKHACKHACK Hard-coded type index based on my example program.
+
+		case ASuspend:
+			w.WriteByte(0x00)  // Hard coded tag index: We only need one tag, call it "yield" for the WasmFX implementation of the goroutine scheduler.
+
+		case ASwitch:
+			// "switch" isn't presently used, but represents the start of a switch-based implementation.
+			w.WriteByte(0x0d)  // HACKHACKHACK Continuation type
+			w.WriteByte(0x00)  // Hard coded tag index.
+
+		case AResume:
+			w.WriteByte(0x0d)  // Continuation type index. HACKHACKHACK.
+			w.WriteByte(0x01)  // size of handler table
+			w.WriteByte(0x00)  // "on" clause with handler, not switch
+			w.WriteByte(0x00)  // tag 0 ->
+			w.WriteByte(0x00)  //   label 0  (hard-coded for the implementation in asm_wasm.s)
+
 		case AMemoryCopy:
 			w.WriteByte(0x00)
 			w.WriteByte(0x00)
-
 		}
 	}
 
@@ -1371,8 +1416,12 @@ func writeOpcode(w *bytes.Buffer, as obj.As) {
 		w.WriteByte(byte(as - ADrop + 0x1A))
 	case as < AI32Load:
 		w.WriteByte(byte(as - ALocalGet + 0x20))
-	case as < AI32TruncSatF32S:
+	case as < ARefNull:
 		w.WriteByte(byte(as - AI32Load + 0x28))
+	case as < AContNew:
+		w.WriteByte(byte(as - ARefNull + 0xD0))
+	case as < AI32TruncSatF32S:
+		w.WriteByte(byte(as - AContNew + 0xE0))
 	case as < ALast:
 		w.WriteByte(0xFC)
 		w.WriteByte(byte(as - AI32TruncSatF32S + 0x00))

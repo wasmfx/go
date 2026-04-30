@@ -38,6 +38,10 @@ TEXT ·checkASM(SB), NOSPLIT, $0-1
 	RET
 
 TEXT runtime·gogo(SB), NOSPLIT, $0-8
+    ;; buf+0(FP) (==8(SP)) is the function argument, which is a gobuf data structure.
+	;; It identifies the incoming g. The current g is I guess in the global, g (global1 in Wasm)
+	;; I think we will have to save the outgoing g somewhere so that the resuminator can take
+	;; the suspended continuation and store it in that
 	MOVD buf+0(FP), R0
 	MOVD gobuf_g(R0), R1
 	MOVD 0(R1), R2	// make sure g != nil
@@ -537,18 +541,8 @@ TEXT wasm_pc_f_loop(SB),NOSPLIT,$0
 	loop:
 		Loop
 			Call resuminator
-			Get SP
-			Drop
-			// This block provides a target for the resume-handler to jump to.
-			Block 114  // 0x80 - (index of type of continuations = 14)
-				ARefFunc wasm_pc_f_loop1(SB)
-				AContNew 5
-				AResume  // Args to resume are hard-coded in writeOpcode in wasmobj.go
-				ARefNull // Push a null continuation reference as a dummy to feed the "Drop" below, when we are falling through here.
-			End
-			Drop  // consume the continuation that was passed when jumping to the resume-handler
 
-			Get PAUSE
+		    Get PAUSE
 			I32Eqz
 			BrIf loop
 		End
@@ -556,30 +550,6 @@ TEXT wasm_pc_f_loop(SB),NOSPLIT,$0
 
 	I32Const $0
 	Set PAUSE
-
-	Return
-
-// wasm_pc_f_loop1 is the target for resume to invoke each time it is called.
-// This is a factoring that I have come up with, not necessarily a good way
-// to split responsibilities around the wasm_pc_f_loop.
-//
-// This routine has the responsibility of setting up the context and calling
-// the desired function. In a mature implementation, we'd probably have resume
-// invoke a desired continuation directly.
-TEXT wasm_pc_f_loop1(SB),NOSPLIT,$0
-	// Get PC_B & PC_F from -8(SP)
-	Get SP
-	I32Const $8
-	I32Sub
-	I32Load16U $0 // PC_B
-
-	Get SP
-	I32Const $8
-	I32Sub
-	I32Load $2 // PC_F
-
-	CallIndirect $0
-	Drop
 
 	Return
 

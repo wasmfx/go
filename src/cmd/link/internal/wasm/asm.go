@@ -186,7 +186,8 @@ func asmb2(ctxt *ld.Link, ldr *loader.Loader) {
 		}
 	}
 
-	hostImportMap[77217] = int64(len(hostImports))
+	// HACK: magic number discovered in debug output! Fragile as number of functions changes.
+	hostImportMap[77212] = int64(len(hostImports))
 	hostImports = append(hostImports, &wasmFunc{
 		Module: "wasmfx",
 		Name:   "resuminator",
@@ -356,7 +357,7 @@ func writeTypeSec(ctxt *ld.Link, types []*wasmFuncType) {
 func writeImportSec(ctxt *ld.Link, hostImports []*wasmFunc) {
 	sizeOffset := writeSecHeader(ctxt, sectionImport)
 
-	writeUleb128(ctxt.Out, uint64(len(hostImports))) // number of imports
+	writeUleb128(ctxt.Out, uint64(1 + len(hostImports))) // number of imports
 	for _, fn := range hostImports {
 		if fn.Module != "" {
 			writeName(ctxt.Out, fn.Module)
@@ -367,6 +368,12 @@ func writeImportSec(ctxt *ld.Link, hostImports []*wasmFunc) {
 		ctxt.Out.WriteByte(0x00) // func import
 		writeUleb128(ctxt.Out, uint64(fn.Type))
 	}
+
+	writeName(ctxt.Out, "wasmfx")
+	writeName(ctxt.Out, "yield")
+	ctxt.Out.WriteByte(0x04) // tag import
+	ctxt.Out.WriteByte(0x00) // tag type prefix
+	ctxt.Out.WriteByte(0x0b) // hard-coded index to the type [] -> []
 
 	writeSecSize(ctxt, sizeOffset)
 }
@@ -419,13 +426,7 @@ func writeMemorySec(ctxt *ld.Link, ldr *loader.Loader) {
 // writeTagSec writes the section that declares effect tags. Currently there is only a single tag,
 // used to implement goroutines with stack-switching instructions (suspend/resume).
 func writeTagSec(ctxt *ld.Link) {
-	sizeOffset := writeSecHeader(ctxt, sectionTag)
-
-	writeUleb128(ctxt.Out, 1)                        // number of tags
-	ctxt.Out.WriteByte(0x00)                         // A tag we will call $yield, index 0
-	ctxt.Out.WriteByte(0x0b)                         //    the tag's function type
-
-	writeSecSize(ctxt, sizeOffset)
+	return  // I was hard-coding the tags; now they come from a different module, compiled from .wat.
 }
 
 // writeGlobalSec writes the section that declares global variables.
@@ -468,8 +469,8 @@ func writeExportSec(ctxt *ld.Link, ldr *loader.Loader, lenHostImports int) {
 
 	switch buildcfg.GOOS {
 	case "wasip1":
-		ldr.WasmExports = append(ldr.WasmExports, ldr.Lookup("wasm_pc_f_loop1", 0))
-		writeUleb128(ctxt.Out, uint64(2+len(ldr.WasmExports))) // number of exports
+		// ldr.WasmExports = append(ldr.WasmExports, ldr.Lookup("wasm_pc_f_loop1", 0))
+		writeUleb128(ctxt.Out, uint64(4 + len(ldr.WasmExports))) // number of exports
 		var entry, entryExpName string
 		switch ctxt.BuildMode {
 		case ld.BuildModeExe:
@@ -494,9 +495,17 @@ func writeExportSec(ctxt *ld.Link, ldr *loader.Loader, lenHostImports int) {
 			ctxt.Out.WriteByte(0x00)            // func export
 			writeUleb128(ctxt.Out, uint64(idx)) // funcidx
 		}
+		writeName(ctxt.Out, "table")  // table of function references to jump to from the trampoline
+		ctxt.Out.WriteByte(0x01)      // table export
+		writeUleb128(ctxt.Out, 0)     // table idx
+
 		writeName(ctxt.Out, "memory") // memory in wasi
 		ctxt.Out.WriteByte(0x02)      // mem export
 		writeUleb128(ctxt.Out, 0)     // memidx
+
+		writeName(ctxt.Out, "SP")     // Stack pointer global
+		ctxt.Out.WriteByte(0x03)      // glob export
+		writeUleb128(ctxt.Out, 0)     // global idx
 	case "js":
 		writeUleb128(ctxt.Out, uint64(4+len(ldr.WasmExports))) // number of exports
 		for _, name := range []string{"run", "resume", "getsp"} {

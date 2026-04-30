@@ -14,6 +14,7 @@ import (
 	"internal/abi"
 	"io"
 	"math"
+	"strings"
 )
 
 var Register = map[string]int16{
@@ -1275,6 +1276,8 @@ func assemble(ctxt *obj.Link, s *obj.LSym, newprog obj.ProgAlloc) {
 			})
 
 		case ACall:
+			if (strings.Contains(ctxt.PosTable.Pos(p.Pos).String(), "asm_wasm.s")) {
+			}
 			switch p.To.Type {
 			case obj.TYPE_CONST:
 				writeUleb128(w, uint64(p.To.Offset))
@@ -1285,15 +1288,17 @@ func assemble(ctxt *obj.Link, s *obj.LSym, newprog obj.ProgAlloc) {
 					panic("bad name for Call")
 				}
 				typ := objabi.R_CALL
-				if p.Mark&WasmImport != 0 {
+				// TODO: somehow mark the resuminator call with WasmImport.
+				if p.Mark&WasmImport != 0 || p.To.Sym.Name == "resuminator" {
 					typ = objabi.R_WASMIMPORT
 				}
-				s.AddRel(ctxt, obj.Reloc{
+				rel := obj.Reloc{
 					Type: typ,
 					Off:  int32(w.Len()),
 					Siz:  1, // actually variable sized
 					Sym:  p.To.Sym,
-				})
+				}
+				s.AddRel(ctxt, rel)
 				if hasLocalSP {
 					// The stack may have moved, which changes SP. Update the local SP variable.
 					updateLocalSP(w)

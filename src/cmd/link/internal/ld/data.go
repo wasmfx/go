@@ -181,7 +181,7 @@ func FoldSubSymbolOffset(ldr *loader.Loader, s loader.Sym) (loader.Sym, int64) {
 // and resolves them where applicable. Relocations are often
 // architecture-specific, requiring calls into the 'archreloc' and/or
 // 'archrelocvariant' functions for the architecture. When external
-// linking is in effect, it may not be  possible to completely resolve
+// linking is in effect, it may not be possible to completely resolve
 // the address/offset for a symbol, in which case the goal is to lay
 // the groundwork for turning a given relocation into an external reloc
 // (to be applied by the external linker). For more on how relocations
@@ -426,12 +426,14 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte) {
 				errorexit()
 			}
 		case objabi.R_DWTXTADDR_U1, objabi.R_DWTXTADDR_U2, objabi.R_DWTXTADDR_U3, objabi.R_DWTXTADDR_U4:
+			// fmt.Printf("Got here in ld/data.go: relocsym: R_DWTXTADDR_UX: target=%s, rs=%d, rst=%d, rt=%d\n", ldr.SymName(rs), rs, rst, rt)
 			unit := ldr.SymUnit(rs)
 			if idx, ok := unit.Addrs[rs]; ok {
 				o = int64(idx)
 			} else {
 				st.err.Errorf(s, "missing .debug_addr index relocation target %s", ldr.SymName(rs))
 			}
+			// fmt.Printf("The o is %d\n", o)
 
 			// For these relocations we write a ULEB128, but using a
 			// cooked/hacked recipe that ensures the result has a
@@ -495,6 +497,7 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte) {
 			// The method offset tables using this relocation expect the offset to be relative
 			// to the start of the first text section, even if there are multiple.
 			if sect.Name == ".text" {
+				// fmt.Printf("Got here in ld/data.go: relocsym: R_ADDROFF: target=%s, rs=%d, rst=%d, rt=%d\n", ldr.SymName(rs), rs, rst, rt)
 				o = ldr.SymValue(rs) - int64(Segtext.Sections[0].Vaddr) + r.Add()
 				if target.IsWasm() {
 					// On Wasm, textoff (e.g. in the method table) is just the function index,
@@ -526,6 +529,9 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte) {
 			}
 			fallthrough
 		case objabi.R_CALL, objabi.R_PCREL:
+			if (strings.Contains(ldr.SymName(rs), "resum")) {
+			    // fmt.Printf("Got here in ld/data.go: relocsym: R_CALL/R_PCREL: target=%s, rs=%d, rst=%d, rt=%d\n", ldr.SymName(rs), rs, rst, rt)
+			}
 			if target.IsExternal() && rs != 0 && rst == sym.SUNDEFEXT {
 				// pass through to the external linker.
 				nExtReloc++
@@ -967,6 +973,7 @@ func dynrelocsym(ctxt *Link, s loader.Sym) {
 	syms := &ctxt.ArchSyms
 	relocs := ldr.Relocs(s)
 	for ri := 0; ri < relocs.Count(); ri++ {
+		// fmt.Printf("Got here in ld/data.go: dynrelocsym: target=%s, s=%d, ri=%d\n", target, s, ri)
 		r := relocs.At(ri)
 		if r.IsMarker() {
 			continue // skip marker relocations

@@ -536,6 +536,9 @@ TEXT wasm_pc_f_loop(SB),NOSPLIT,$0
 	If
 	loop:
 		Loop
+			Call resuminator
+			Get SP
+			Drop
 			// This block provides a target for the resume-handler to jump to.
 			Block 114  // 0x80 - (index of type of continuations = 14)
 				ARefFunc wasm_pc_f_loop1(SB)

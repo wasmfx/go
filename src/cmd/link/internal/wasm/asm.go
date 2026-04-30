@@ -165,23 +165,34 @@ func asmb2(ctxt *ld.Link, ldr *loader.Loader) {
 		for ri := 0; ri < relocs.Count(); ri++ {
 			r := relocs.At(ri)
 			if r.Type() == objabi.R_WASMIMPORT {
-				if wsym := ldr.WasmImportSym(fn); wsym != 0 {
-					wi := readWasmImport(ldr, wsym)
-					hostImportMap[fn] = int64(len(hostImports))
-					hostImports = append(hostImports, &wasmFunc{
-						Module: wi.Module,
-						Name:   wi.Name,
-						Type: lookupType(&wasmFuncType{
-							Params:  fieldsToTypes(wi.Params),
-							Results: fieldsToTypes(wi.Results),
-						}, &types),
-					})
-				} else {
-					panic(fmt.Sprintf("missing wasm symbol for %s", ldr.SymName(r.Sym())))
+				// TODO: Need to find proper way to hack resuminator into the ldr and its WasmImportSyms.
+				if ldr.SymName(r.Sym()) != "resuminator" {
+					if wsym := ldr.WasmImportSym(fn); wsym != 0 {
+						wi := readWasmImport(ldr, wsym)
+						hostImportMap[fn] = int64(len(hostImports))
+						hostImports = append(hostImports, &wasmFunc{
+							Module: wi.Module,
+							Name:   wi.Name,
+							Type: lookupType(&wasmFuncType{
+								Params:  fieldsToTypes(wi.Params),
+								Results: fieldsToTypes(wi.Results),
+								}, &types),
+						})
+					} else {
+						panic(fmt.Sprintf("missing wasm symbol for %s", ldr.SymName(r.Sym())))
+					}
 				}
 			}
 		}
 	}
+
+	hostImportMap[77217] = int64(len(hostImports))
+	hostImports = append(hostImports, &wasmFunc{
+		Module: "wasmfx",
+		Name:   "resuminator",
+		Type:   11,
+	})
+	fmt.Printf("host imports: %v\n", hostImports[len(hostImports)-1])
 
 	// collect functions with WebAssembly body
 	var buildid []byte
@@ -200,18 +211,25 @@ func asmb2(ctxt *ld.Link, ldr *loader.Loader) {
 			off := int32(0)
 			for ri := 0; ri < relocs.Count(); ri++ {
 				r := relocs.At(ri)
+				// fmt.Printf("Got here in asmb2: SymName(fn)=%s, fn=%d, r=%d\n", ldr.SymName(fn), fn, r)
 				if r.Siz() == 0 {
 					continue // skip marker relocations
 				}
 				wfn.Write(P[off:r.Off()])
 				off = r.Off()
 				rs := r.Sym()
+				// fmt.Printf("rs = %d\n", rs)
+				// fmt.Printf("rs = %s\n", ldr.SymName(rs))
 				switch r.Type() {
 				case objabi.R_ADDR:
+					// fmt.Printf("R_ADDR: %s + %d\n", ldr.SymName(rs), r.Add())
 					writeSleb128(wfn, ldr.SymValue(rs)+r.Add())
 				case objabi.R_CALL:
-					writeSleb128(wfn, int64(len(hostImports))+ldr.SymValue(rs)>>16-funcValueOffset)
+					// fmt.Printf("R_CALL: %s + %d\n", ldr.SymName(rs), len(hostImports), ldr.SymValue(rs), funcValueOffset)
+					writeSleb128(wfn, int64(len(hostImports)) + ldr.SymValue(rs)>>16 - funcValueOffset)
 				case objabi.R_WASMIMPORT:
+					fmt.Printf("Doing relocation for R_WASMIMPORT: %s (#%d)\n", ldr.SymName(rs), rs)
+					fmt.Printf("    offset is : %s\n", hostImportMap[rs])
 					writeSleb128(wfn, hostImportMap[rs])
 				default:
 					ldr.Errorf(fn, "bad reloc type %d (%s)", r.Type(), sym.RelocName(ctxt.Arch, r.Type()))
@@ -450,6 +468,7 @@ func writeExportSec(ctxt *ld.Link, ldr *loader.Loader, lenHostImports int) {
 
 	switch buildcfg.GOOS {
 	case "wasip1":
+		ldr.WasmExports = append(ldr.WasmExports, ldr.Lookup("wasm_pc_f_loop1", 0))
 		writeUleb128(ctxt.Out, uint64(2+len(ldr.WasmExports))) // number of exports
 		var entry, entryExpName string
 		switch ctxt.BuildMode {
@@ -469,6 +488,7 @@ func writeExportSec(ctxt *ld.Link, ldr *loader.Loader, lenHostImports int) {
 		ctxt.Out.WriteByte(0x00)            // func export
 		writeUleb128(ctxt.Out, uint64(idx)) // funcidx
 		for _, s := range ldr.WasmExports {
+			fmt.Printf("exporting %s\n", ldr.SymName(s))
 			idx := uint32(lenHostImports) + uint32(ldr.SymValue(s)>>16) - funcValueOffset
 			writeName(ctxt.Out, ldr.SymName(s))
 			ctxt.Out.WriteByte(0x00)            // func export

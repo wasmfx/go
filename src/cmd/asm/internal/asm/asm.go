@@ -575,12 +575,25 @@ func (p *Parser) asmJump(op obj.As, cond string, a []obj.Addr) {
 
 func (p *Parser) patch() {
 	for _, patch := range p.toPatch {
-		targetProg := p.labels[patch.label]
-		if targetProg == nil {
-			p.errorf("undefined label %s", patch.label)
-			return
+		targetProg := (*obj.Prog)(nil)
+		if patch.label == "resuminator" {
+			*patch.addr = obj.Addr{
+				Type: obj.TYPE_MEM,
+				Sym: &obj.LSym{Pkg: "wasmfx", Name: "resuminator"},
+				Name: obj.NAME_EXTERN,
+				}
+
+			fmt.Printf("Patching in %v\n", patch)
+			fmt.Printf("Patch.addr %v\n", patch.addr)
+
+		} else {
+			targetProg = p.labels[patch.label]
+			if targetProg == nil {
+				p.errorf("undefined label %s", patch.label)
+				return
+			}
+			p.branch(patch.addr, targetProg)
 		}
-		p.branch(patch.addr, targetProg)
 	}
 	p.toPatch = p.toPatch[:0]
 }

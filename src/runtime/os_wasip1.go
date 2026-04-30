@@ -266,3 +266,7 @@ func nanotime1() int64 {
 	}
 	return int64(time)
 }
+
+// TODO: This does not suffice to get resuminator defined as a wasmimport.
+//go:wasmimport wasmfx resuminator
+func resuminator()

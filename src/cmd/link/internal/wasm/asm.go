@@ -166,7 +166,7 @@ func asmb2(ctxt *ld.Link, ldr *loader.Loader) {
 			r := relocs.At(ri)
 			if r.Type() == objabi.R_WASMIMPORT {
 				// TODO: Need to find proper way to hack resuminator into the ldr and its WasmImportSyms.
-				if ldr.SymName(r.Sym()) != "resuminator" {
+				// if ldr.SymName(r.Sym()) != "resuminator" {
 					if wsym := ldr.WasmImportSym(fn); wsym != 0 {
 						wi := readWasmImport(ldr, wsym)
 						hostImportMap[fn] = int64(len(hostImports))
@@ -181,18 +181,18 @@ func asmb2(ctxt *ld.Link, ldr *loader.Loader) {
 					} else {
 						panic(fmt.Sprintf("missing wasm symbol for %s", ldr.SymName(r.Sym())))
 					}
-				}
+				// }
 			}
 		}
 	}
 
-	// HACK: magic number discovered in debug output! Fragile as number of functions changes.
-	hostImportMap[77212] = int64(len(hostImports))
-	hostImports = append(hostImports, &wasmFunc{
-		Module: "wasmfx",
-		Name:   "resuminator",
-		Type:   11,
-	})
+	// // HACK: magic number discovered in debug output! Fragile as number of functions changes.
+	// hostImportMap[77721] = int64(len(hostImports))
+	// hostImports = append(hostImports, &wasmFunc{
+	// 	Module: "wasmfx",
+	// 	Name:   "resuminator",
+	// 	Type:   11,
+	// })
 	fmt.Printf("host imports: %v\n", hostImports[len(hostImports)-1])
 
 	// collect functions with WebAssembly body
@@ -336,7 +336,7 @@ func writeTypeSec(ctxt *ld.Link, types []*wasmFuncType) {
 	// In the example program, this will be index 13.
 	// HACKHACKHACK hard-coding the function and continuation types that we need.
 	ctxt.Out.WriteByte(0x5d)   // General tag for a continuation type
-	writeUleb128(ctxt.Out, 11)  // Index of the function type of the continuation type. HACKHACKHACK
+	writeUleb128(ctxt.Out, 7)  // Index of the function type of the continuation type. HACKHACKHACK
 	// Useful func types: as observed in the executable, type index 0 happens to be i32 -> i32, 11 is [] -> []
 
 	// In the example program, this will be index 14.
@@ -347,7 +347,7 @@ func writeTypeSec(ctxt *ld.Link, types []*wasmFuncType) {
 	ctxt.Out.WriteByte(0x00)  // zero parameters
 	ctxt.Out.WriteByte(0x01)  // one result
 	ctxt.Out.WriteByte(0x63)  // ref nullable
-	ctxt.Out.WriteByte(0x0d)  // our continuation type created above, index 13.
+	ctxt.Out.WriteByte(0x0b)  // our continuation type created above, index 11.
 
 	writeSecSize(ctxt, sizeOffset)
 }
@@ -373,7 +373,7 @@ func writeImportSec(ctxt *ld.Link, hostImports []*wasmFunc) {
 	writeName(ctxt.Out, "yield")
 	ctxt.Out.WriteByte(0x04) // tag import
 	ctxt.Out.WriteByte(0x00) // tag type prefix
-	ctxt.Out.WriteByte(0x0b) // hard-coded index to the type [] -> []
+	ctxt.Out.WriteByte(0x06) // hard-coded index to the type [] -> [cont []->[]]
 
 	writeSecSize(ctxt, sizeOffset)
 }

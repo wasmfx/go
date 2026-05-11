@@ -1206,3 +1206,49 @@ func (p *pp) doPrintln(a []any) {
 	}
 	p.buf.writeByte('\n')
 }
+
+//go:wasmexport printNum
+func printNum(arg int64) {
+	print("Printing something ")
+	for {
+		d := arg % 16
+		if (d == 0) {
+			print("0")
+		} else if (d == 1) {
+			print("1")
+		} else if (d == 2) {
+			print("2")
+		} else if (d == 3) {
+			print("3")
+		} else if (d == 4) {
+			print("4")
+		} else if (d == 5) {
+			print("5")
+		} else if (d == 6) {
+			print("6")
+		} else if (d == 7) {
+			print("7")
+		} else if (d == 8) {
+			print("8")
+		} else if (d == 9) {
+			print("9")
+		} else if (d == 10) {
+			print("a")
+		} else if (d == 11) {
+			print("b")
+		} else if (d == 12) {
+			print("c")
+		} else if (d == 13) {
+			print("d")
+		} else if (d == 14) {
+			print("e")
+		} else if (d == 15) {
+			print("f")
+		}
+		if (arg == 0) {
+			print("\n")
+			return
+		}
+		arg = arg / 10
+	}
+}

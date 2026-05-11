@@ -763,11 +763,16 @@ func genWasmImportWrapper(s *obj.LSym, appendp func(p *obj.Prog, as obj.As, args
 		Sym:  s,
 	}
 
+	if wi.Name == "resuminator" {
+		fmt.Println("  Generating resuminator wrapper")
+		p = appendp(p, ACall, to)
+		p.Mark = WasmImport
+	} else
 	// If the module that the import is for is our magic "gojs" module, then this
 	// indicates that the called function understands the Go stack-based call convention
 	// so we just pass the stack pointer to it, knowing it will read the params directly
 	// off the stack and push the results into memory based on the stack pointer.
-	if wi.Module == GojsModule {
+	if wi.Module == GojsModule || wi.Name == "resuminator" {
 		// The called function has a signature of 'func(sp int)'. It has access to the memory
 		// value somewhere to be able to address the memory based on the "sp" value.
 

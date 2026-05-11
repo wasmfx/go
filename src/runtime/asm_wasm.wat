@@ -6,6 +6,7 @@
   (import "main" "table" (table $0 2 funcref))
   (import "main" "memory" (memory $0 2))
   (import "main" "SP" (global $0 (mut i32)))
+  (import "main" "printNum" (func $printNum (type $ft2)))
 ;;   (import "main" "wasm_pc_f_loop" (func $wasm_pc_f_loop (type $ft0)))
 ;;   (func $wasm_pc_f_loop (import "main" "wasm_pc_f_loop") (type $ft0))
 ;;   (import "main" "wasm_pc_f_loop2" (func $wasm_pc_f_loop2 (type $ft0)))
@@ -22,11 +23,39 @@
         (resume $ct1 (on $yield $on_yield))
         (ref.null $ct1)   ;; A dummy for the continuation value that would be given if we had suspended.
     )
+
+    ;; store the continuation at the outgoing groutine's index in the continuation table.
+    ;; invoke the continuation of the incoming groutine. Scheduler will have put incoming groutine at XXX
+    ;; and the outgoing groutine at YYY.
+    ;;
+    ;; Need to intercede into the "new goroutine" code to allocate a table-index.
     (drop)  ;; Drop the continuation that was passed from the suspend.
+
+    ;; HACK SUPER HACK
+    ;; the wrapper function generated for resuminator will pop the stack for us.
+    ;; Which is not what we want! So we decrement the stack here to offset what the
+    ;; wrapper will do.
+    (global.get 0)
+    (i32.const 8)
+    (i32.sub)
+    (global.set 0)
   )
+
   (func $wasm_pc_f_loop2 (export "wasm_pc_f_loop2")
+    (local $debug1 i32)
+    (local $debug2 i32)
+
+    ;; (global.get 0)
+    ;; (i64.extend_i32_s)
+    ;; (call $printNum)
+
+    ;; (i64.load (global.get 0))
+    ;; (call $printNum)
+
     (i32.load16_u (i32.sub (global.get $0) (i32.const 8)))
+    (local.tee $debug1)
     (i32.load offset=2 (i32.sub (global.get 0) (i32.const 8)))
+    (local.tee $debug2)
     (call_indirect (type $ft1))
     (drop)
     (return)

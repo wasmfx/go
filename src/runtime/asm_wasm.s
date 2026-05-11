@@ -38,10 +38,10 @@ TEXT ·checkASM(SB), NOSPLIT, $0-1
 	RET
 
 TEXT runtime·gogo(SB), NOSPLIT, $0-8
-    ;; buf+0(FP) (==8(SP)) is the function argument, which is a gobuf data structure.
-	;; It identifies the incoming g. The current g is I guess in the global, g (global1 in Wasm)
-	;; I think we will have to save the outgoing g somewhere so that the resuminator can take
-	;; the suspended continuation and store it in that
+    // buf+0(FP) (==8(SP)) is the function argument, which is a gobuf data structure.
+	// It identifies the incoming g. The current g is I guess in the global, g (global1 in Wasm)
+	// I think we will have to save the outgoing g somewhere so that the resuminator can take
+	// the suspended continuation and store it in that
 	MOVD buf+0(FP), R0
 	MOVD gobuf_g(R0), R1
 	MOVD 0(R1), R2	// make sure g != nil
@@ -540,7 +540,9 @@ TEXT wasm_pc_f_loop(SB),NOSPLIT,$0
 	If
 	loop:
 		Loop
-			Call resuminator
+			I32Const $0  // HACK: unnecessary
+			Call runtime·resuminator(SB)
+			Drop
 
 		    Get PAUSE
 			I32Eqz

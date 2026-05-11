@@ -5302,6 +5302,8 @@ func syscall_runtime_AfterExec() {
 	execLock.unlock()
 }
 
+var nextContIndex atomic.Int32
+
 // Allocate a new g, with a stack big enough for stacksize bytes.
 func malg(stacksize int32) *g {
 	newg := new(g)
@@ -5319,6 +5321,8 @@ func malg(stacksize int32) *g {
 		// there on gsignal stack during VDSO on ARM and ARM64.
 		*(*uintptr)(unsafe.Pointer(newg.stack.lo)) = 0
 	}
+	newg.wasmfxContIndex = nextContIndex.Add(1)
+	//print("set wasmfxContIndex to", newg.wasmfxContIndex, "\n");
 	return newg
 }
 

@@ -593,6 +593,10 @@ type g struct {
 	// valgrindStackID is used to track what memory is used for stacks when a program is
 	// built with the "valgrind" build tag, otherwise it is unused.
 	valgrindStackID uintptr
+
+	// Index to the place in the continuation table where this goroutine's
+	// continuation is stored when it is suspended.
+	wasmfxContIndex int32
 }
 
 // gTrackingPeriod is the number of transitions out of _Grunning between

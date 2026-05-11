@@ -470,7 +470,7 @@ func writeExportSec(ctxt *ld.Link, ldr *loader.Loader, lenHostImports int) {
 	switch buildcfg.GOOS {
 	case "wasip1":
 		// ldr.WasmExports = append(ldr.WasmExports, ldr.Lookup("wasm_pc_f_loop1", 0))
-		writeUleb128(ctxt.Out, uint64(4 + len(ldr.WasmExports))) // number of exports
+		writeUleb128(ctxt.Out, uint64(5 + len(ldr.WasmExports))) // number of exports
 		var entry, entryExpName string
 		switch ctxt.BuildMode {
 		case ld.BuildModeExe:
@@ -506,6 +506,10 @@ func writeExportSec(ctxt *ld.Link, ldr *loader.Loader, lenHostImports int) {
 		writeName(ctxt.Out, "SP")     // Stack pointer global
 		ctxt.Out.WriteByte(0x03)      // glob export
 		writeUleb128(ctxt.Out, 0)     // global idx
+
+		writeName(ctxt.Out, "g")     // g pointer global
+		ctxt.Out.WriteByte(0x03)      // glob export
+		writeUleb128(ctxt.Out, 2)     // global idx
 	case "js":
 		writeUleb128(ctxt.Out, uint64(4+len(ldr.WasmExports))) // number of exports
 		for _, name := range []string{"run", "resume", "getsp"} {

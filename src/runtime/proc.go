@@ -3388,6 +3388,7 @@ func execute(gp *g, inheritTime bool) {
 		traceRelease(trace)
 	}
 
+//	print("In execute, gonna gogo", gp.wasmfxContIndex, "\n")
 	gogo(&gp.sched)
 }
 

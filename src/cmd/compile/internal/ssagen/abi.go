@@ -565,6 +565,7 @@ func setupWasmImport(f *ir.Func) {
 		wi.Params = paramsToWasmFields(f, "go:wasmimport", abiInfo, abiInfo.InParams())
 		wi.Results = resultsToWasmFields(f, "go:wasmimport", abiInfo, abiInfo.OutParams())
 	}
+	fmt.Println("Setting up wasm import", f, wi)
 	f.LSym.Func().WasmImport = &wi
 }
 

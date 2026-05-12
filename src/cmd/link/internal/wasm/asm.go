@@ -165,6 +165,7 @@ func asmb2(ctxt *ld.Link, ldr *loader.Loader) {
 		for ri := 0; ri < relocs.Count(); ri++ {
 			r := relocs.At(ri)
 			if r.Type() == objabi.R_WASMIMPORT {
+				fmt.Println(ldr.SymName(r.Sym()))
 				// TODO: Need to find proper way to hack resuminator into the ldr and its WasmImportSyms.
 				// if ldr.SymName(r.Sym()) != "resuminator" {
 					if wsym := ldr.WasmImportSym(fn); wsym != 0 {

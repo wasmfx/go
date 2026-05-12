@@ -195,6 +195,7 @@ func preprocess(ctxt *obj.Link, s *obj.LSym, newprog obj.ProgAlloc) {
 	// generate the code to translate from our internal Go-stack
 	// based call convention to the native webassembly call convention.
 	if s.Func().WasmImport != nil {
+		fmt.Println("Processing wasm import", s.Func().WasmImport)
 		genWasmImportWrapper(s, appendp)
 
 		// It should be 0 already, but we'll set it to 0 anyway just to be sure
@@ -763,6 +764,8 @@ func genWasmImportWrapper(s *obj.LSym, appendp func(p *obj.Prog, as obj.As, args
 		Sym:  s,
 	}
 
+//	fmt.Println("Generating wrapper for wasm import", wi)
+	fmt.Println("Generating wrapper for wasm import", wi.Module, wi.Name, "with params", wi.Params, "and results", wi.Results)
 	if wi.Name == "resuminator" {
 		fmt.Println("  Generating resuminator wrapper")
 		p = appendp(p, ACall, to)
@@ -773,6 +776,8 @@ func genWasmImportWrapper(s *obj.LSym, appendp func(p *obj.Prog, as obj.As, args
 	// so we just pass the stack pointer to it, knowing it will read the params directly
 	// off the stack and push the results into memory based on the stack pointer.
 	if wi.Module == GojsModule || wi.Name == "resuminator" {
+		fmt.Println("  Generating wrapper the simple way")
+
 		// The called function has a signature of 'func(sp int)'. It has access to the memory
 		// value somewhere to be able to address the memory based on the "sp" value.
 

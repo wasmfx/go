@@ -59,10 +59,9 @@
     (local.set $suspension)
 
     ;; store the continuation at the outgoing groutine's index in the continuation table.
-    ;; invoke the continuation of the incoming groutine. Scheduler will have put incoming groutine at XXX
-    ;; and the outgoing groutine at YYY.
-    ;;
-    ;; Need to intercede into the "new goroutine" code to allocate a table-index.
+    ;; invoke the continuation of the incoming groutine. Presently we're finding the prior
+    ;; goroutine at the top of this function where it was in global $g and we don't need
+    ;; to know the identity of the incoming goroutine.
 
     (local.get $idx1)
     (local.get $suspension)

@@ -61,6 +61,8 @@ TEXT runtime·gogo(SB), NOSPLIT, $0-8
 	I64Store $0
 
 	MOVD gobuf_ctxt(R0), CTXT
+	// Not sure what should happen here. I found this was clobbering some stack pointers that I needed later.
+	// Revisit this.
 	// // clear to help garbage collector
 	// MOVD $0, gobuf_sp(R0)
 	MOVD $0, gobuf_ctxt(R0)

@@ -317,6 +317,10 @@ type gobuf struct {
 	ctxt unsafe.Pointer
 	lr   uintptr
 	bp   uintptr // for framepointer-enabled architectures
+
+	// HACK. This info is needed by the wasm mcall routine. Might be a better way.
+	mcallfn uint
+	mcallg0 uint
 }
 
 // maybeTraceablePtr is a special pointer that is conditionally trackable

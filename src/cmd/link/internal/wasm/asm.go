@@ -76,6 +76,8 @@ var wasmFuncTypes = map[string]*wasmFuncType{
 	"wasm_export_getsp":       {Results: []byte{I32}},                                     // sp
 	"wasm_pc_f_loop":          {Params: []byte{}},                                         //
 	"wasm_pc_f_loop1":         {Params: []byte{}},                                         //
+	// "mcall0":                  {Params: []byte{}},                                         //
+	// "runtime.mcall0":          {Params: []byte{}},                                         //
 	"wasm_pc_f_loop_export":   {Params: []byte{I32}},                                      // pc_f
 	"runtime.wasmDiv":         {Params: []byte{I64, I64}, Results: []byte{I64}},           // x, y -> x/y
 	"runtime.wasmTruncS":      {Params: []byte{F64}, Results: []byte{I64}},                // x -> int(x)
@@ -358,7 +360,7 @@ func writeTypeSec(ctxt *ld.Link, types []*wasmFuncType) {
 func writeImportSec(ctxt *ld.Link, hostImports []*wasmFunc) {
 	sizeOffset := writeSecHeader(ctxt, sectionImport)
 
-	writeUleb128(ctxt.Out, uint64(1 + len(hostImports))) // number of imports
+	writeUleb128(ctxt.Out, uint64(2 + len(hostImports))) // number of imports
 	for _, fn := range hostImports {
 		if fn.Module != "" {
 			writeName(ctxt.Out, fn.Module)
@@ -371,7 +373,13 @@ func writeImportSec(ctxt *ld.Link, hostImports []*wasmFunc) {
 	}
 
 	writeName(ctxt.Out, "wasmfx")
-	writeName(ctxt.Out, "yield")
+	writeName(ctxt.Out, "gogo")
+	ctxt.Out.WriteByte(0x04) // tag import
+	ctxt.Out.WriteByte(0x00) // tag type prefix
+	ctxt.Out.WriteByte(0x06) // hard-coded index to the type [] -> [cont []->[]]
+
+	writeName(ctxt.Out, "wasmfx")
+	writeName(ctxt.Out, "scheduler")
 	ctxt.Out.WriteByte(0x04) // tag import
 	ctxt.Out.WriteByte(0x00) // tag type prefix
 	ctxt.Out.WriteByte(0x06) // hard-coded index to the type [] -> [cont []->[]]
@@ -471,7 +479,7 @@ func writeExportSec(ctxt *ld.Link, ldr *loader.Loader, lenHostImports int) {
 	switch buildcfg.GOOS {
 	case "wasip1":
 		// ldr.WasmExports = append(ldr.WasmExports, ldr.Lookup("wasm_pc_f_loop1", 0))
-		writeUleb128(ctxt.Out, uint64(5 + len(ldr.WasmExports))) // number of exports
+		writeUleb128(ctxt.Out, uint64(6 + len(ldr.WasmExports))) // number of exports
 		var entry, entryExpName string
 		switch ctxt.BuildMode {
 		case ld.BuildModeExe:
@@ -496,6 +504,10 @@ func writeExportSec(ctxt *ld.Link, ldr *loader.Loader, lenHostImports int) {
 			ctxt.Out.WriteByte(0x00)            // func export
 			writeUleb128(ctxt.Out, uint64(idx)) // funcidx
 		}
+		writeName(ctxt.Out, "mcall0")
+		ctxt.Out.WriteByte(0x00)      // func export
+		writeUleb128(ctxt.Out, 1386)  // funcidx
+
 		writeName(ctxt.Out, "table")  // table of function references to jump to from the trampoline
 		ctxt.Out.WriteByte(0x01)      // table export
 		writeUleb128(ctxt.Out, 0)     // table idx

@@ -2,27 +2,31 @@
   (type $ft0 (func (param) (result)))
   (type $ft1 (func (param i32) (result i32)))
   (type $ft2 (func (param i64) (result)))
-;;   (type $ft1 (func (param i32) (result i32)))
   (type $ct1 (cont $ft0))
+  (type $scheduler-context-ftype (func (param i32) (param (ref null $ct1))))
+  (type $scheduler-context-ctype (cont $scheduler-context-ftype))
+
   (import "main" "table" (table $0 2 funcref))
   (import "main" "memory" (memory $0 2))
   (import "main" "SP" (global $SP (mut i32)))
   (import "main" "g" (global $g (mut i64)))
+  (import "main" "mcall0" (func $mcall0 (type $ft1)))
   (import "main" "printNum" (func $printNum (type $ft2)))
   (table $contTable 1000 (ref null $ct1))
 
 ;;   (import "main" "wasm_pc_f_loop" (func $wasm_pc_f_loop (type $ft0)))
 ;;   (func $wasm_pc_f_loop (import "main" "wasm_pc_f_loop") (type $ft0))
-;;   (import "main" "wasm_pc_f_loop2" (func $wasm_pc_f_loop2 (type $ft0)))
-  (tag $yield)
-  (export "yield" (tag $yield))
-;;   (func $wasm_pc_f_loop (export "wasm_pc_f_loop") (param) (result) )
-  (elem declare func $wasm_pc_f_loop2)
-;;   (func $wasm_pc_f_loop2 (export "wasm_pc_f_loop2") (param) (result) )
+;;   (import "main" "invokinator" (func $invokinator (type $ft0)))
+  (tag $gogo)
+  (tag $scheduler)
+  (export "gogo" (tag $gogo))
+  (export "scheduler" (tag $scheduler))
+  (elem declare func $invokinator)
+  (elem declare func $scheduler_context)
 
   (func $resuminator (export "resuminator") (param) (result)
     (local $suspension (ref null $ct1))
-    (local $g-index i32)
+    (local $g-index i32)  ;; this is the index of the prior g, which will tell us where to store the suspension that is created when a goroutine hits the scheduler code (mcall).
 
     ;; Fetch the current g's wasmFxContIndex for use when we do table.set later.
     ;; We want the g object that we're coming in on. When we are suspended to the
@@ -33,8 +37,16 @@
     ;; continuation after the jump.
     (global.get $g) ;; get the global g structure
     (i32.wrap_i64)
-    (i32.load offset=448)  ;; get wasmfxContIndex from g
+    ;; (i32.load offset=448)  ;; get wasmfxContIndex from g
+    (i32.load offset=464)  ;; get wasmfxContIndex from g    ;; ... offset seems to have changed
     (local.tee $g-index)
+
+    ;; (global.set $SP (i32.sub (global.get $SP) (i32.const 8)))
+    ;; (i32.store (global.get $SP) (local.get $g-index))
+    ;; (global.set $SP (i32.sub (global.get $SP) (i32.const 8)))
+    ;; ;; not setting return address
+    ;; (call $printNum (i64.const 0))
+    ;; (global.set $SP (i32.add (global.get $SP) (i32.const 16)))
 
     (table.get $contTable)
     ;; Note here we're setting $suspension to the immediate continuation that we
@@ -42,31 +54,30 @@
     ;; new continuation that was captured at the suspend site. These should
     ;; correspond to successive suspensions of the same goroutine.
     (local.set $suspension)
+    (table.set $contTable (local.get $g-index) (ref.null $ct1))  ;; if we come around on that g-index again, we should have a null which kicks in the invokinator instead.
 
-    ;; Call wasm_pc_f_loop2 in a resume context with a $yield handler that just
-    ;; ignores the yielded continuation and returns.
-    (block $on_yield (result (ref null $ct1))
-
-        (if (ref.is_null (local.get $suspension))
-          (then (local.set $suspension (cont.new $ct1 (ref.func $wasm_pc_f_loop2))))
+    (block $exit (result)
+        ;; Call this continuation in a resume context with two handlers, $gogo and $scheduler.
+        ;; The $gogo handler just stores the resulting continuation in an appropriate
+        (block $gogo_handler (result (ref null $ct1))
+            (resume $ct1
+              ;; (on $scheduler $scheduler_handler)
+              (on $gogo $gogo_handler)
+                (cont.bind $scheduler-context-ctype $ct1
+                  (local.get $g-index)
+                  (local.get $suspension)
+                  (cont.new $scheduler-context-ctype (ref.func $scheduler_context))
+                  )
+              )
+            (ref.null $ct1)   ;; A dummy for the continuation value that would be given if we had suspended.
         )
 
-        ;;(cont.new $ct1 (ref.func $wasm_pc_f_loop2))
-        (resume $ct1 (on $yield $on_yield) (local.get $suspension))
-        (ref.null $ct1)   ;; A dummy for the continuation value that would be given if we had suspended.
+        ;; LABEL gogo_handler:
+        (drop) ;; continuation when we hit gogo is not used; that is some throwaway "m stack."
+        (br $exit)
     )
-    (local.set $suspension)
+    ;; LABEL exit:
 
-    ;; store the continuation at the outgoing groutine's index in the continuation table.
-    ;; invoke the continuation of the incoming groutine. Presently we're finding the prior
-    ;; goroutine at the top of this function where it was in global $g and we don't need
-    ;; to know the identity of the incoming goroutine.
-
-    (local.get $g-index)
-    (local.get $suspension)
-    (table.set $contTable)
-
-    ;; HACK SUPER HACK
     ;; the wrapper function generated for resuminator will pop the stack for us.
     ;; Which is not what we want! So we decrement the stack here to offset what the
     ;; wrapper will do.
@@ -76,7 +87,38 @@
     (global.set 0)
   )
 
-  (func $wasm_pc_f_loop2 (export "wasm_pc_f_loop2")
+  (func $scheduler_context (param $g-index i32) (param $suspension (ref null $ct1)) (result)
+      ;;(call $printNum (i64.extend_i32_u (local.get $g-index)))
+      ;; Call the nominated continuation (in $suspension) or if we don't have one, use invokinator to start something based on pc_f/pc_b.
+      (if (ref.is_null (local.get $suspension))
+        (then
+          (local.set $suspension (cont.new $ct1 (ref.func $invokinator))))
+      )
+      (block $exit
+        (block $scheduler_handler (result (ref null $ct1))
+          (resume $ct1
+            (on $scheduler $scheduler_handler)
+            (local.get $suspension))
+          (ref.null $ct1)
+          (br $exit)
+        )  ;; LABEL scheduler_handler:
+        (local.set $suspension)
+        ;; store the continuation at the outgoing groutine's index in the continuation table.
+        ;; invoke the continuation of the incoming groutine. Presently we're finding the prior
+        ;; goroutine at the top of this function where it was in global $g and we don't need
+        ;; to know the identity of the incoming goroutine.
+        (local.get $g-index)
+        (local.get $suspension)
+        (table.set $contTable)
+
+        (i32.const 0)   ;; The PC_B for the call to $mcall0. Probably $mcall0 could be compiled w/o that convention but I don't know how.
+        (call $mcall0)  ;; is expected to suspend to the $gogo_handler
+        (unreachable)
+      )  ;; LABEL exit:
+      (return)
+  )
+
+  (func $invokinator (export "invokinator")
     (local $debug1 i32)
     (local $debug2 i32)
 
@@ -98,7 +140,7 @@
   )
 
 ;; The disassembly of the original wasm_pc_f_loop1, which was extracted from wasm_pc_f_loop.
-;; That's now translated into wasm_pc_f_loop2 above.
+;; That's now translated into invokinator above.
 ;;
 ;;  0x134fce | 18          | size of function
 ;;  0x134fcf | 00          | 0 local blocks
@@ -116,3 +158,4 @@
 ;;  0x134fe5 | 00          | unreachable
 ;;  0x134fe6 | 0b          | end
 )
+

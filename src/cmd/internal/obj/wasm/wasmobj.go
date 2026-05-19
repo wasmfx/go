@@ -1388,7 +1388,7 @@ func assemble(ctxt *obj.Link, s *obj.LSym, newprog obj.ProgAlloc) {
 			w.WriteByte(0x0d)  // HACKHACKHACK Hard-coded type index based on my example program.
 
 		case ASuspend:
-			w.WriteByte(0x00)  // Hard coded tag index: We only need one tag, call it "yield" for the WasmFX implementation of the goroutine scheduler.
+			writeUleb128(w, uint64(p.To.Offset))
 
 		case ASwitch:
 			// "switch" isn't presently used, but represents the start of a switch-based implementation.

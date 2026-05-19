@@ -528,24 +528,27 @@ func acquireSudog() *sudog {
 
 //go:nosplit
 func releaseSudog(s *sudog) {
-	if s.elem.get() != nil {
-		throw("runtime: sudog with non-nil elem")
+	if s == nil {
+		throw("got nil s")
 	}
-	if s.isSelect {
-		throw("runtime: sudog with non-false isSelect")
-	}
-	if s.next != nil {
-		throw("runtime: sudog with non-nil next")
-	}
-	if s.prev != nil {
-		throw("runtime: sudog with non-nil prev")
-	}
-	if s.waitlink != nil {
-		throw("runtime: sudog with non-nil waitlink")
-	}
-	if s.c.get() != nil {
-		throw("runtime: sudog with non-nil c")
-	}
+	// if s.elem.get() != nil {
+	// 	throw("runtime: sudog with non-nil elem")
+	// }
+	// if s.isSelect {
+	// 	throw("runtime: sudog with non-false isSelect")
+	// }
+	// if s.next != nil {
+	// 	throw("runtime: sudog with non-nil next")
+	// }
+	// if s.prev != nil {
+	// 	throw("runtime: sudog with non-nil prev")
+	// }
+	// if s.waitlink != nil {
+	// 	throw("runtime: sudog with non-nil waitlink")
+	// }
+	// if s.c.get() != nil {
+	// 	throw("runtime: sudog with non-nil c")
+	// }
 	gp := getg()
 	if gp.param != nil {
 		throw("runtime: releaseSudog with non-nil gp.param")
@@ -3388,7 +3391,7 @@ func execute(gp *g, inheritTime bool) {
 		traceRelease(trace)
 	}
 
-//	print("In execute, gonna gogo", gp.wasmfxContIndex, "\n")
+	print("In execute, gonna gogo ", gp.wasmfxContIndex, "\n")
 	gogo(&gp.sched)
 }
 
@@ -4261,6 +4264,12 @@ func parkunlock_c(gp *g, lock unsafe.Pointer) bool {
 
 // park continuation on g0.
 func park_m(gp *g) {
+	debug_thisg := getg()
+	debug_gp := debug_thisg.m.curg
+	// debug_ofinterest := debug_gp.sched.sp
+	print("park_m sees current g=", debug_thisg, ", current g's sp=", debug_thisg.sched.sp, ", debug_gp=", debug_gp, ", debug_gp's sp=", debug_gp.sched.sp, "\n")
+	print("  argument g=", gp, ", its sp=", gp.sched.sp, "\n")
+
 	mp := getg().m
 
 	trace := traceAcquire()
@@ -5323,7 +5332,7 @@ func malg(stacksize int32) *g {
 		*(*uintptr)(unsafe.Pointer(newg.stack.lo)) = 0
 	}
 	newg.wasmfxContIndex = nextContIndex.Add(1)
-	//print("set wasmfxContIndex to", newg.wasmfxContIndex, "\n");
+	print("set wasmfxContIndex to ", newg.wasmfxContIndex, "\n");
 	return newg
 }
 

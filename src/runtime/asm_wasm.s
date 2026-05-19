@@ -38,13 +38,18 @@ TEXT ·checkASM(SB), NOSPLIT, $0-1
 	RET
 
 TEXT runtime·gogo(SB), NOSPLIT, $0-8
-    // buf+0(FP) (==8(SP)) is the function argument, which is a gobuf data structure.
-	// It identifies the incoming g. The current g is I guess in the global, g (global1 in Wasm)
+	// buf+0(FP) (==8(SP)) is the function argument, which is a gobuf data structure.
+	// It identifies the new g. The current g is I guess in the global, g (global1 in Wasm)
 	// I think we will have to save the outgoing g somewhere so that the resuminator can take
 	// the suspended continuation and store it in that
+
+	// Move the prior g into a local so that we can restore it after suspend.
+	// will also need its SP.
+
 	MOVD buf+0(FP), R0
 	MOVD gobuf_g(R0), R1
 	MOVD 0(R1), R2	// make sure g != nil
+	MOVD g, R2	// Store the old g in a local for use after Suspend.
 	MOVD R1, g
 	MOVD gobuf_sp(R0), SP
 
@@ -56,8 +61,8 @@ TEXT runtime·gogo(SB), NOSPLIT, $0-8
 	I64Store $0
 
 	MOVD gobuf_ctxt(R0), CTXT
-	// clear to help garbage collector
-	MOVD $0, gobuf_sp(R0)
+	// // clear to help garbage collector
+	// MOVD $0, gobuf_sp(R0)
 	MOVD $0, gobuf_ctxt(R0)
 
 	// Argh: The first time through gogo, it's called outside of the context of
@@ -70,7 +75,15 @@ TEXT runtime·gogo(SB), NOSPLIT, $0-8
 		I64Const 1
 		Set RET3
 	Else
-		ASuspend 0   // tag 0, i.e. "yield"
+
+		ASuspend 0   // tag 0, i.e. "gogo"; simply aborts the scheduler stack, goes to $gogo_handler in asm_wasm.wat.
+
+		Nop
+		// After coming back here we must set SP, g, and CTXT to the original thread's.
+		// TODO: I don't think we ever come here in fact. Delete.
+		MOVD R2, g
+		MOVD g_sched+gobuf_sp(g), SP // TODO: was SP actually stored? do we need to store it somewhere?
+		MOVD g_sched+gobuf_ctxt(g), CTXT // TODO: was SP actually stored? do we need to store it somewhere?
 	End
 
 	I32Const $1
@@ -87,6 +100,7 @@ TEXT runtime·mcall(SB), NOSPLIT, $0-8
 	MOVD g_m(g), R1
 	// R2 = g0
 	MOVD m_g0(R1), R2
+	MOVD g, R3
 
 	// save state in g->sched
 	MOVD 0(SP), g_sched+gobuf_pc(g)     // caller's PC
@@ -99,6 +113,41 @@ TEXT runtime·mcall(SB), NOSPLIT, $0-8
 	If
 		JMP runtime·badmcall(SB)
 	End
+
+    MOVD CTXT, g_sched+gobuf_mcallfn(g)  // For use of mcall0
+    MOVD R2, g_sched+gobuf_mcallg0(g)  // For use of mcall0
+
+	//JMP runtime·mcall(SB)
+
+	ASuspend 1  // tag $scheduler
+
+	// THIS IS WHERE WE NEED THE SP RESTORATION
+	MOVD g_sched+gobuf_sp(R3), SP
+
+	// Useless rigamarole just to keep mcall0 from being removed
+	I32Const 1
+	I32Eqz
+	If
+		I32Const 1
+		Call runtime·mcall0(SB)
+		Drop
+	End
+
+	I32Const 0
+	Return
+
+// (debugger) p 2105880
+// memory[0][2105880] (u64) = 30CE230000000000
+// (debugger) p 2106360
+// memory[0][2106360] (u64) = 68EF220000000000
+// (debugger) p 2106840
+// memory[0][2106840] (u64) = 58F7220000000000
+// (debugger) p 2107320
+// memory[0][2107320] (u64) = 48FF220000000000
+
+TEXT runtime·mcall0(SB), NOSPLIT, $0-8
+    MOVD g_sched+gobuf_mcallfn(g), CTXT
+    MOVD g_sched+gobuf_mcallg0(g), R2
 
 	// switch to g0's stack
 	I64Load (g_sched+gobuf_sp)(R2)
@@ -544,7 +593,7 @@ TEXT wasm_pc_f_loop(SB),NOSPLIT,$0
 			Call runtime·resuminator(SB)
 			Drop
 
-		    Get PAUSE
+			Get PAUSE
 			I32Eqz
 			BrIf loop
 		End

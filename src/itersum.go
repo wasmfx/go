@@ -35,11 +35,12 @@ func runsum(n int32) {
 }
 
 func main() {
+  print("hi")
   first, err := strconv.Atoi(os.Args[1])
   if err != nil { panic("arg not parsed as int32") }
   last, err := strconv.Atoi(os.Args[2])
   if err != nil { panic("arg not parsed as int32") }
-  
+
   for i := int32(first); i <= int32(last); i++ {
     start := time.Now()
 //    runsum(i * 1000000)

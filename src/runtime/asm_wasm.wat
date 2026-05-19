@@ -22,8 +22,7 @@
 
   (func $resuminator (export "resuminator") (param) (result)
     (local $suspension (ref null $ct1))
-    (local $idx1 i32)
-    (local $idx2 i32)
+    (local $g-index i32)
 
     ;; Fetch the current g's wasmFxContIndex for use when we do table.set later.
     ;; We want the g object that we're coming in on. When we are suspended to the
@@ -35,7 +34,7 @@
     (global.get $g) ;; get the global g structure
     (i32.wrap_i64)
     (i32.load offset=448)  ;; get wasmfxContIndex from g
-    (local.tee $idx1)
+    (local.tee $g-index)
 
     (table.get $contTable)
     ;; Note here we're setting $suspension to the immediate continuation that we
@@ -63,7 +62,7 @@
     ;; goroutine at the top of this function where it was in global $g and we don't need
     ;; to know the identity of the incoming goroutine.
 
-    (local.get $idx1)
+    (local.get $g-index)
     (local.get $suspension)
     (table.set $contTable)
 

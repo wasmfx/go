@@ -121,8 +121,6 @@ TEXT runtime·mcall(SB), NOSPLIT, $0-8
     MOVD CTXT, g_sched+gobuf_mcallfn(g)  // For use of mcall0
     MOVD R2, g_sched+gobuf_mcallg0(g)  // For use of mcall0
 
-	//JMP runtime·mcall(SB)
-
 	ASuspend 1  // tag $scheduler
 
 	// THIS IS WHERE WE NEED THE SP RESTORATION

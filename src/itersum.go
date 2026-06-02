@@ -9,7 +9,7 @@ import "time"
 // Send them on the given channel.
 func generator(c chan int32, n int32) {
   for i := int32(0); i < n; i++ {
-    c <- i + 8
+    c <- i
   }
   close(c)
 }
@@ -30,8 +30,8 @@ func summer(c chan int32) int32 {
 func runsum(n int32) {
   c := make(chan int32)
   go generator(c, n)
-  summer(c)
-  // fmt.Println("Result: %d", result)
+  result := summer(c)
+  fmt.Println("Result: ", result)
 }
 
 func main() {

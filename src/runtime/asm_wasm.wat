@@ -43,13 +43,6 @@
     (i32.load offset=464)  ;; get wasmfxContIndex from g    ;; ... offset seems to have changed
     (local.tee $g-index)
 
-    ;; (global.set $SP (i32.sub (global.get $SP) (i32.const 8)))
-    ;; (i32.store (global.get $SP) (local.get $g-index))
-    ;; (global.set $SP (i32.sub (global.get $SP) (i32.const 8)))
-    ;; ;; not setting return address
-    ;; (call $printNum (i64.const 0))
-    ;; (global.set $SP (i32.add (global.get $SP) (i32.const 16)))
-
     (table.get $contTable)
     ;; Note here we're setting $suspension to the immediate continuation that we
     ;; are about to resume into, while at the resume handler we'll set it to the

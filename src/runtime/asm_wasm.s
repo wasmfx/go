@@ -78,7 +78,10 @@ TEXT runtime·gogo(SB), NOSPLIT, $0-8
 		Set RET3
 	Else
 
-		ASuspend 0   // tag 0, i.e. "gogo"; simply aborts the scheduler stack, goes to $gogo_handler in asm_wasm.wat.
+		// ASuspend 0   // tag 0, i.e. "gogo"; simply aborts the scheduler stack, goes to $gogo_handler in asm_wasm.wat.
+		I32Const 7  // ignored, needed by wrapper
+		Call runtime·exit_scheduler(SB)
+		Drop  // ignore what's left by the wrapper.
 
 		Nop
 		// After coming back here we must set SP, g, and CTXT to the original thread's.

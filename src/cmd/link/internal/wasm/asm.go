@@ -506,7 +506,7 @@ func writeExportSec(ctxt *ld.Link, ldr *loader.Loader, lenHostImports int) {
 		}
 		writeName(ctxt.Out, "mcall0")
 		ctxt.Out.WriteByte(0x00)      // func export
-		writeUleb128(ctxt.Out, 1386)  // funcidx
+		writeUleb128(ctxt.Out, 1388)  // funcidx
 
 		writeName(ctxt.Out, "table")  // table of function references to jump to from the trampoline
 		ctxt.Out.WriteByte(0x01)      // table export

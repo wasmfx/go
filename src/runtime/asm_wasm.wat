@@ -19,8 +19,10 @@
 ;;   (import "main" "invokinator" (func $invokinator (type $ft0)))
   (tag $gogo)
   (tag $scheduler)
+  (tag $exit-scheduler-exn) ;; an exception that we throw to exit the scheduler and return out of mcall.
   (export "gogo" (tag $gogo))
   (export "scheduler" (tag $scheduler))
+  ;; (export "exit-scheduler" (tag $exit-scheduler))
   (elem declare func $invokinator)
   (elem declare func $scheduler_context)
 
@@ -59,21 +61,11 @@
     (block $exit (result)
         ;; Call this continuation in a resume context with two handlers, $gogo and $scheduler.
         ;; The $gogo handler just stores the resulting continuation in an appropriate
-        (block $gogo_handler (result (ref null $ct1))
-            (resume $ct1
-              ;; (on $scheduler $scheduler_handler)
-              (on $gogo $gogo_handler)
-                (cont.bind $scheduler-context-ctype $ct1
-                  (local.get $g-index)
-                  (local.get $suspension)
-                  (cont.new $scheduler-context-ctype (ref.func $scheduler_context))
-                  )
-              )
-            (ref.null $ct1)   ;; A dummy for the continuation value that would be given if we had suspended.
-        )
-
-        ;; LABEL gogo_handler:
-        (drop) ;; continuation when we hit gogo is not used; that is some throwaway "m stack."
+        (block $gogo_handler (result)
+            (try_table (result) (catch $exit-scheduler-exn $gogo_handler)
+               (call $scheduler_context (local.get $g-index) (local.get $suspension))
+            )
+        )  ;; LABEL gogo_handler:
         (br $exit)
     )
     ;; LABEL exit:
@@ -117,6 +109,9 @@
       )  ;; LABEL exit:
       (return)
   )
+
+  (func $exit_scheduler (export "exit_scheduler")
+    (throw $exit-scheduler-exn))
 
   (func $invokinator (export "invokinator")
     (local $debug1 i32)

@@ -5332,7 +5332,7 @@ func malg(stacksize int32) *g {
 		*(*uintptr)(unsafe.Pointer(newg.stack.lo)) = 0
 	}
 	newg.wasmfxContIndex = nextContIndex.Add(1)
-	// print("set wasmfxContIndex to ", newg.wasmfxContIndex, "\n");
+	// print("set wasmfxContIndex to ", newg.wasmfxContIndex, "\n")
 	return newg
 }
 

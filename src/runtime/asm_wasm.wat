@@ -11,21 +11,22 @@
   (import "main" "SP" (global $SP (mut i32)))
   (import "main" "g" (global $g (mut i64)))
   (import "main" "mcall0" (func $mcall0 (type $ft1)))
+  (import "main" "morestack" (func $morestack (type $ft1)))
   (import "main" "printNum" (func $printNum (type $ft2)))
   (table $contTable 1000 (ref null $ct1))
 
-;;   (import "main" "wasm_pc_f_loop" (func $wasm_pc_f_loop (type $ft0)))
-;;   (func $wasm_pc_f_loop (import "main" "wasm_pc_f_loop") (type $ft0))
-;;   (import "main" "invokinator" (func $invokinator (type $ft0)))
   (tag $gogo)
   (tag $scheduler)
+  (tag $more-stack-tag)
   (tag $exit-scheduler-exn) ;; an exception that we throw to exit the scheduler and return out of mcall.
   (export "gogo" (tag $gogo))
   (export "scheduler" (tag $scheduler))
+  (export "more-stack-tag" (tag $more-stack-tag))
   ;; (export "exit-scheduler" (tag $exit-scheduler))
   (elem declare func $invokinator)
   (elem declare func $scheduler_context)
 
+  ;; Misnomer: This function is now actually the scheduler-context, and the one by that name is the resume handler.
   (func $resuminator (export "resuminator") (param) (result)
     (local $suspension (ref null $ct1))
     (local $g-index i32)  ;; this is the index of the prior g, which will tell us where to store the suspension that is created when a goroutine hits the scheduler code (mcall).
@@ -72,6 +73,7 @@
     (global.set 0)
   )
 
+  ;; Misnomer: This function is now actually the resume handler, and "resuminator" is actually the stack frame that holds the scheduler context. TODO: switch them
   (func $scheduler_context (param $g-index i32) (param $suspension (ref null $ct1)) (result)
       ;;(call $printNum (i64.extend_i32_u (local.get $g-index)))
       ;; Call the nominated continuation (in $suspension) or if we don't have one, use invokinator to start something based on pc_f/pc_b.
@@ -80,9 +82,11 @@
           (local.set $suspension (cont.new $ct1 (ref.func $invokinator))))
       )
       (block $exit
+        (block $more-stack-handler (result (ref null $ct1))
         (block $scheduler_handler (result (ref null $ct1))
           (resume $ct1
             (on $scheduler $scheduler_handler)
+            (on $more-stack-tag $more-stack-handler)
             (local.get $suspension))
           (ref.null $ct1)
           (br $exit)
@@ -98,6 +102,18 @@
 
         (i32.const 0)   ;; The PC_B for the call to $mcall0. Probably $mcall0 could be compiled w/o that convention but I don't know how.
         (call $mcall0)  ;; is expected to suspend to the $gogo_handler
+        (unreachable)
+        )  ;; LABEL more-stack-handler:
+        (local.set $suspension)
+        ;; store the continuation at the outgoing groutine's index in the continuation table.
+        ;; invoke the continuation of the incoming groutine. Presently we're finding the prior
+        ;; goroutine at the top of this function where it was in global $g and we don't need
+        ;; to know the identity of the incoming goroutine.
+        (local.get $g-index)
+        (local.get $suspension)
+        (table.set $contTable)
+        (i32.const 0)   ;; The PC_B for the call to $mcall0. Probably $mcall0 could be compiled w/o that convention but I don't know how.
+        (call $morestack)  ;; is expected to suspend to the $gogo_handler
         (unreachable)
       )  ;; LABEL exit:
       (return)

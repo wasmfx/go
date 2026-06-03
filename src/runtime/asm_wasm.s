@@ -138,15 +138,11 @@ TEXT runtime·mcall(SB), NOSPLIT, $0-8
 	I32Const 0
 	Return
 
-// (debugger) p 2105880
-// memory[0][2105880] (u64) = 30CE230000000000
-// (debugger) p 2106360
-// memory[0][2106360] (u64) = 68EF220000000000
-// (debugger) p 2106840
-// memory[0][2106840] (u64) = 58F7220000000000
-// (debugger) p 2107320
-// memory[0][2107320] (u64) = 48FF220000000000
 
+// This is the stub to "jump to whatever mcall was asked to jump to"
+// But this part is used after we have suspended, so that the continuation
+// was already captured and the stack that we go into from here is
+// ultimately thrown away (by a call to gogo).
 TEXT runtime·mcall0(SB), NOSPLIT, $0-8
     MOVD g_sched+gobuf_mcallfn(g), CTXT
     MOVD g_sched+gobuf_mcallg0(g), R2
@@ -353,7 +349,21 @@ TEXT runtime·morestack(SB), NOSPLIT, $0-0
 // morestack but not preserving ctxt.
 TEXT runtime·morestack_noctxt(SB),NOSPLIT,$0
 	MOVD $0, CTXT
-	JMP runtime·morestack(SB)
+
+	MOVD g, R3
+
+	ASuspend 2  // tag $more-stack-tag
+
+	// THIS IS WHERE WE NEED THE SP RESTORATION
+	MOVD g_sched+gobuf_sp(R3), SP
+
+	Get SP
+	I32Const $8
+	I32Sub
+	Set SP
+
+	RET
+//	JMP runtime·morestack(SB)
 
 TEXT ·asmcgocall(SB), NOSPLIT, $0-0
 	UNDEF

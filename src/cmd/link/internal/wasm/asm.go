@@ -76,8 +76,6 @@ var wasmFuncTypes = map[string]*wasmFuncType{
 	"wasm_export_getsp":       {Results: []byte{I32}},                                     // sp
 	"wasm_pc_f_loop":          {Params: []byte{}},                                         //
 	"wasm_pc_f_loop1":         {Params: []byte{}},                                         //
-	// "mcall0":                  {Params: []byte{}},                                         //
-	// "runtime.mcall0":          {Params: []byte{}},                                         //
 	"wasm_pc_f_loop_export":   {Params: []byte{I32}},                                      // pc_f
 	"runtime.wasmDiv":         {Params: []byte{I64, I64}, Results: []byte{I64}},           // x, y -> x/y
 	"runtime.wasmTruncS":      {Params: []byte{F64}, Results: []byte{I64}},                // x -> int(x)
@@ -168,23 +166,20 @@ func asmb2(ctxt *ld.Link, ldr *loader.Loader) {
 			r := relocs.At(ri)
 			if r.Type() == objabi.R_WASMIMPORT {
 				fmt.Println(ldr.SymName(r.Sym()))
-				// TODO: Need to find proper way to hack resuminator into the ldr and its WasmImportSyms.
-				// if ldr.SymName(r.Sym()) != "resuminator" {
-					if wsym := ldr.WasmImportSym(fn); wsym != 0 {
-						wi := readWasmImport(ldr, wsym)
-						hostImportMap[fn] = int64(len(hostImports))
-						hostImports = append(hostImports, &wasmFunc{
-							Module: wi.Module,
-							Name:   wi.Name,
-							Type: lookupType(&wasmFuncType{
-								Params:  fieldsToTypes(wi.Params),
-								Results: fieldsToTypes(wi.Results),
-								}, &types),
-						})
-					} else {
-						panic(fmt.Sprintf("missing wasm symbol for %s", ldr.SymName(r.Sym())))
-					}
-				// }
+				if wsym := ldr.WasmImportSym(fn); wsym != 0 {
+					wi := readWasmImport(ldr, wsym)
+					hostImportMap[fn] = int64(len(hostImports))
+					hostImports = append(hostImports, &wasmFunc{
+						Module: wi.Module,
+						Name:   wi.Name,
+						Type: lookupType(&wasmFuncType{
+							Params:  fieldsToTypes(wi.Params),
+							Results: fieldsToTypes(wi.Results),
+						}, &types),
+					})
+				} else {
+					panic(fmt.Sprintf("missing wasm symbol for %s", ldr.SymName(r.Sym())))
+				}
 			}
 		}
 	}
@@ -230,7 +225,7 @@ func asmb2(ctxt *ld.Link, ldr *loader.Loader) {
 					writeSleb128(wfn, ldr.SymValue(rs)+r.Add())
 				case objabi.R_CALL:
 					// fmt.Printf("R_CALL: %s + %d\n", ldr.SymName(rs), len(hostImports), ldr.SymValue(rs), funcValueOffset)
-					writeSleb128(wfn, int64(len(hostImports)) + ldr.SymValue(rs)>>16 - funcValueOffset)
+					writeSleb128(wfn, int64(len(hostImports))+ldr.SymValue(rs)>>16-funcValueOffset)
 				case objabi.R_WASMIMPORT:
 					fmt.Printf("Doing relocation for R_WASMIMPORT: %s (#%d)\n", ldr.SymName(rs), rs)
 					fmt.Printf("    offset is : %s\n", hostImportMap[rs])
@@ -322,7 +317,7 @@ func writeBuildID(ctxt *ld.Link, buildid []byte) {
 func writeTypeSec(ctxt *ld.Link, types []*wasmFuncType) {
 	sizeOffset := writeSecHeader(ctxt, sectionType)
 
-	writeUleb128(ctxt.Out, uint64(len(types) + 2))  // hard-coding two extra types at the bottom.
+	writeUleb128(ctxt.Out, uint64(len(types)+2)) // hard-coding two extra types at the bottom.
 
 	for _, t := range types {
 		ctxt.Out.WriteByte(0x60) // functype
@@ -338,8 +333,8 @@ func writeTypeSec(ctxt *ld.Link, types []*wasmFuncType) {
 
 	// In the example program, this will be index 13.
 	// HACKHACKHACK hard-coding the function and continuation types that we need.
-	ctxt.Out.WriteByte(0x5d)   // General tag for a continuation type
-	writeUleb128(ctxt.Out, 7)  // Index of the function type of the continuation type. HACKHACKHACK
+	ctxt.Out.WriteByte(0x5d)  // General tag for a continuation type
+	writeUleb128(ctxt.Out, 7) // Index of the function type of the continuation type. HACKHACKHACK
 	// Useful func types: as observed in the executable, type index 0 happens to be i32 -> i32, 11 is [] -> []
 
 	// In the example program, this will be index 14.
@@ -347,10 +342,10 @@ func writeTypeSec(ctxt *ld.Link, types []*wasmFuncType) {
 	//
 	// Function type
 	ctxt.Out.WriteByte(0x60)
-	ctxt.Out.WriteByte(0x00)  // zero parameters
-	ctxt.Out.WriteByte(0x01)  // one result
-	ctxt.Out.WriteByte(0x63)  // ref nullable
-	ctxt.Out.WriteByte(0x0b)  // our continuation type created above, index 11.
+	ctxt.Out.WriteByte(0x00) // zero parameters
+	ctxt.Out.WriteByte(0x01) // one result
+	ctxt.Out.WriteByte(0x63) // ref nullable
+	ctxt.Out.WriteByte(0x0b) // our continuation type created above, index 11.
 
 	writeSecSize(ctxt, sizeOffset)
 }
@@ -360,7 +355,7 @@ func writeTypeSec(ctxt *ld.Link, types []*wasmFuncType) {
 func writeImportSec(ctxt *ld.Link, hostImports []*wasmFunc) {
 	sizeOffset := writeSecHeader(ctxt, sectionImport)
 
-	writeUleb128(ctxt.Out, uint64(2 + len(hostImports))) // number of imports
+	writeUleb128(ctxt.Out, uint64(3+len(hostImports))) // number of imports
 	for _, fn := range hostImports {
 		if fn.Module != "" {
 			writeName(ctxt.Out, fn.Module)
@@ -380,6 +375,12 @@ func writeImportSec(ctxt *ld.Link, hostImports []*wasmFunc) {
 
 	writeName(ctxt.Out, "wasmfx")
 	writeName(ctxt.Out, "scheduler")
+	ctxt.Out.WriteByte(0x04) // tag import
+	ctxt.Out.WriteByte(0x00) // tag type prefix
+	ctxt.Out.WriteByte(0x06) // hard-coded index to the type [] -> [cont []->[]]
+
+	writeName(ctxt.Out, "wasmfx")
+	writeName(ctxt.Out, "more-stack-tag")
 	ctxt.Out.WriteByte(0x04) // tag import
 	ctxt.Out.WriteByte(0x00) // tag type prefix
 	ctxt.Out.WriteByte(0x06) // hard-coded index to the type [] -> [cont []->[]]
@@ -435,7 +436,7 @@ func writeMemorySec(ctxt *ld.Link, ldr *loader.Loader) {
 // writeTagSec writes the section that declares effect tags. Currently there is only a single tag,
 // used to implement goroutines with stack-switching instructions (suspend/resume).
 func writeTagSec(ctxt *ld.Link) {
-	return  // I was hard-coding the tags; now they come from a different module, compiled from .wat.
+	return // I was hard-coding the tags; now they come from a different module, compiled from .wat.
 }
 
 // writeGlobalSec writes the section that declares global variables.
@@ -479,7 +480,7 @@ func writeExportSec(ctxt *ld.Link, ldr *loader.Loader, lenHostImports int) {
 	switch buildcfg.GOOS {
 	case "wasip1":
 		// ldr.WasmExports = append(ldr.WasmExports, ldr.Lookup("wasm_pc_f_loop1", 0))
-		writeUleb128(ctxt.Out, uint64(6 + len(ldr.WasmExports))) // number of exports
+		writeUleb128(ctxt.Out, uint64(7+len(ldr.WasmExports))) // number of exports
 		var entry, entryExpName string
 		switch ctxt.BuildMode {
 		case ld.BuildModeExe:
@@ -505,24 +506,28 @@ func writeExportSec(ctxt *ld.Link, ldr *loader.Loader, lenHostImports int) {
 			writeUleb128(ctxt.Out, uint64(idx)) // funcidx
 		}
 		writeName(ctxt.Out, "mcall0")
-		ctxt.Out.WriteByte(0x00)      // func export
-		writeUleb128(ctxt.Out, 1388)  // funcidx
+		ctxt.Out.WriteByte(0x00)     // func export
+		writeUleb128(ctxt.Out, 1388) // funcidx
 
-		writeName(ctxt.Out, "table")  // table of function references to jump to from the trampoline
-		ctxt.Out.WriteByte(0x01)      // table export
-		writeUleb128(ctxt.Out, 0)     // table idx
+		writeName(ctxt.Out, "morestack")
+		ctxt.Out.WriteByte(0x00)     // func export
+		writeUleb128(ctxt.Out, 1400) // funcidx
+
+		writeName(ctxt.Out, "table") // table of function references to jump to from the trampoline
+		ctxt.Out.WriteByte(0x01)     // table export
+		writeUleb128(ctxt.Out, 0)    // table idx
 
 		writeName(ctxt.Out, "memory") // memory in wasi
 		ctxt.Out.WriteByte(0x02)      // mem export
 		writeUleb128(ctxt.Out, 0)     // memidx
 
-		writeName(ctxt.Out, "SP")     // Stack pointer global
-		ctxt.Out.WriteByte(0x03)      // glob export
-		writeUleb128(ctxt.Out, 0)     // global idx
+		writeName(ctxt.Out, "SP") // Stack pointer global
+		ctxt.Out.WriteByte(0x03)  // glob export
+		writeUleb128(ctxt.Out, 0) // global idx
 
-		writeName(ctxt.Out, "g")     // g pointer global
-		ctxt.Out.WriteByte(0x03)      // glob export
-		writeUleb128(ctxt.Out, 2)     // global idx
+		writeName(ctxt.Out, "g")  // g pointer global
+		ctxt.Out.WriteByte(0x03)  // glob export
+		writeUleb128(ctxt.Out, 2) // global idx
 	case "js":
 		writeUleb128(ctxt.Out, uint64(4+len(ldr.WasmExports))) // number of exports
 		for _, name := range []string{"run", "resume", "getsp"} {

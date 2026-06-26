@@ -471,6 +471,13 @@ func writeGlobalSec(ctxt *ld.Link) {
 	writeSecSize(ctxt, sizeOffset)
 }
 
+func toFunctionIndex(ldr *loader.Loader, lenHostImports int, name string) uint32 {
+	s := ldr.Lookup(name, 0)
+	idx := uint32(lenHostImports) + uint32(ldr.SymValue(s)>>16) - funcValueOffset
+	print("idx for ", name, " is ", idx, "\n")
+	return idx
+}
+
 // writeExportSec writes the section that declares exports.
 // Exports can be accessed by the WebAssembly host, usually JavaScript.
 // The wasm_export_* functions and the linear memory get exported.
@@ -505,13 +512,16 @@ func writeExportSec(ctxt *ld.Link, ldr *loader.Loader, lenHostImports int) {
 			ctxt.Out.WriteByte(0x00)            // func export
 			writeUleb128(ctxt.Out, uint64(idx)) // funcidx
 		}
-		writeName(ctxt.Out, "mcall0")
-		ctxt.Out.WriteByte(0x00)     // func export
-		writeUleb128(ctxt.Out, 1388) // funcidx
 
+		idx = toFunctionIndex(ldr, lenHostImports, "runtime.mcall0")
+		writeName(ctxt.Out, "mcall0")
+		ctxt.Out.WriteByte(0x00)            // func export
+		writeUleb128(ctxt.Out, uint64(idx)) // funcidx
+
+		idx = toFunctionIndex(ldr, lenHostImports, "runtime.morestack")
 		writeName(ctxt.Out, "morestack")
-		ctxt.Out.WriteByte(0x00)     // func export
-		writeUleb128(ctxt.Out, 1400) // funcidx
+		ctxt.Out.WriteByte(0x00)            // func export
+		writeUleb128(ctxt.Out, uint64(idx)) // funcidx
 
 		writeName(ctxt.Out, "table") // table of function references to jump to from the trampoline
 		ctxt.Out.WriteByte(0x01)     // table export

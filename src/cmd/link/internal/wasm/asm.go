@@ -184,14 +184,10 @@ func asmb2(ctxt *ld.Link, ldr *loader.Loader) {
 		}
 	}
 
-	// // HACK: magic number discovered in debug output! Fragile as number of functions changes.
-	// hostImportMap[77721] = int64(len(hostImports))
-	// hostImports = append(hostImports, &wasmFunc{
-	// 	Module: "wasmfx",
-	// 	Name:   "resuminator",
-	// 	Type:   11,
-	// })
-	fmt.Printf("host imports: %v\n", hostImports[len(hostImports)-1])
+	fmt.Printf("host imports: ")
+	for x := range hostImports {
+		fmt.Printf("  %v\n", hostImports[x])
+	}
 
 	// collect functions with WebAssembly body
 	var buildid []byte

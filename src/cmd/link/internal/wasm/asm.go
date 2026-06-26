@@ -210,7 +210,6 @@ func asmb2(ctxt *ld.Link, ldr *loader.Loader) {
 			off := int32(0)
 			for ri := 0; ri < relocs.Count(); ri++ {
 				r := relocs.At(ri)
-				// fmt.Printf("Got here in asmb2: SymName(fn)=%s, fn=%d, r=%d\n", ldr.SymName(fn), fn, r)
 				if r.Siz() == 0 {
 					continue // skip marker relocations
 				}

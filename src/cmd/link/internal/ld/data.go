@@ -426,7 +426,6 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte) {
 				errorexit()
 			}
 		case objabi.R_DWTXTADDR_U1, objabi.R_DWTXTADDR_U2, objabi.R_DWTXTADDR_U3, objabi.R_DWTXTADDR_U4:
-			// fmt.Printf("Got here in ld/data.go: relocsym: R_DWTXTADDR_UX: target=%s, rs=%d, rst=%d, rt=%d\n", ldr.SymName(rs), rs, rst, rt)
 			unit := ldr.SymUnit(rs)
 			if idx, ok := unit.Addrs[rs]; ok {
 				o = int64(idx)
@@ -497,7 +496,6 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte) {
 			// The method offset tables using this relocation expect the offset to be relative
 			// to the start of the first text section, even if there are multiple.
 			if sect.Name == ".text" {
-				// fmt.Printf("Got here in ld/data.go: relocsym: R_ADDROFF: target=%s, rs=%d, rst=%d, rt=%d\n", ldr.SymName(rs), rs, rst, rt)
 				o = ldr.SymValue(rs) - int64(Segtext.Sections[0].Vaddr) + r.Add()
 				if target.IsWasm() {
 					// On Wasm, textoff (e.g. in the method table) is just the function index,
@@ -529,9 +527,6 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte) {
 			}
 			fallthrough
 		case objabi.R_CALL, objabi.R_PCREL:
-			if (strings.Contains(ldr.SymName(rs), "resum")) {
-			    // fmt.Printf("Got here in ld/data.go: relocsym: R_CALL/R_PCREL: target=%s, rs=%d, rst=%d, rt=%d\n", ldr.SymName(rs), rs, rst, rt)
-			}
 			if target.IsExternal() && rs != 0 && rst == sym.SUNDEFEXT {
 				// pass through to the external linker.
 				nExtReloc++
@@ -973,7 +968,6 @@ func dynrelocsym(ctxt *Link, s loader.Sym) {
 	syms := &ctxt.ArchSyms
 	relocs := ldr.Relocs(s)
 	for ri := 0; ri < relocs.Count(); ri++ {
-		// fmt.Printf("Got here in ld/data.go: dynrelocsym: target=%s, s=%d, ri=%d\n", target, s, ri)
 		r := relocs.At(ri)
 		if r.IsMarker() {
 			continue // skip marker relocations

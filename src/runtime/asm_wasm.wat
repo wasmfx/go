@@ -92,7 +92,7 @@
           (br $exit)
         )  ;; LABEL scheduler_handler:
         (local.set $suspension)
-        ;; store the continuation at the outgoing groutine's index in the continuation table.
+        ;; Store the continuation at the outgoing groutine's index in the continuation table.
         ;; invoke the continuation of the incoming groutine. Presently we're finding the prior
         ;; goroutine at the top of this function where it was in global $g and we don't need
         ;; to know the identity of the incoming goroutine.
@@ -100,7 +100,9 @@
         (local.get $suspension)
         (table.set $contTable)
 
-        (i32.const 0)   ;; The PC_B for the call to $mcall0. Probably $mcall0 could be compiled w/o that convention but I don't know how.
+        ;; Push the PC_B for the call to $mcall0, namely 0. Probably $mcall0 could be compiled
+        ;; w/o that convention but I don't know how.
+        (i32.const 0)
         (call $mcall0)  ;; is expected to suspend to the $gogo_handler
         (unreachable)
         )  ;; LABEL more-stack-handler:
@@ -112,13 +114,18 @@
         (local.get $g-index)
         (local.get $suspension)
         (table.set $contTable)
-        (i32.const 0)   ;; The PC_B for the call to $morestack. Probably $morestack could be compiled w/o that convention but I don't know how.
+        ;; Push the PC_B for the call to $morestack, namely 0. Probably $morestack could be
+        ;; compiled w/o that convention but I don't know how.
+        (i32.const 0)
         (call $morestack)  ;; is expected to suspend to the $gogo_handler
         (unreachable)
       )  ;; LABEL exit:
       (return)
   )
 
+  ;; Used when the go runtime wants to actually throw away current stack and jump out of the
+  ;; scheduler context. That has the effect of going around the trampoline to jump into the stack
+  ;; of the next selected goroutine.
   (func $exit_scheduler (export "exit_scheduler")
     (throw $exit-scheduler-exn))
 
@@ -126,9 +133,11 @@
     (local $debug1 i32)
     (local $debug2 i32)
 
+    ;; Get the PC_B and the function index PC_F from the SP. The PC_B will go on the Wasm stack,
+    ;; the PC_F will be the index in the indirect call table.
     (i32.load16_u (i32.sub (global.get $SP) (i32.const 8)))
     (local.tee $debug1)
-    (i32.load offset=2 (i32.sub (global.get 0) (i32.const 8)))
+    (i32.load offset=2 (i32.sub (global.get $SP) (i32.const 8)))
     (local.tee $debug2)
     (call_indirect (type $ft1))
     (drop)

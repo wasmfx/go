@@ -764,18 +764,8 @@ func genWasmImportWrapper(s *obj.LSym, appendp func(p *obj.Prog, as obj.As, args
 		Sym:  s,
 	}
 
-//	fmt.Println("Generating wrapper for wasm import", wi)
 	fmt.Println("Generating wrapper for wasm import", wi.Module, wi.Name, "with params", wi.Params, "and results", wi.Results)
-	if wi.Name == "resuminator" {
-		fmt.Println("  Generating resuminator wrapper")
-		p = appendp(p, ACall, to)
-		p.Mark = WasmImport
-	} else
-	if wi.Name == "exit_scheduler" {
-		fmt.Println("  Generating exit_scheduler wrapper")
-		p = appendp(p, ACall, to)
-		p.Mark = WasmImport
-	} else
+
 	// If the module that the import is for is our magic "gojs" module, then this
 	// indicates that the called function understands the Go stack-based call convention
 	// so we just pass the stack pointer to it, knowing it will read the params directly

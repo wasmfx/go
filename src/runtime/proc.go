@@ -4176,6 +4176,10 @@ top:
 
 	gp, inheritTime, tryWakeP := findRunnable() // blocks until work is available
 
+	// // debugStr := "Picked " + string(gp.wasmfxContIndex) + " to run next.\n"
+	// // print(debugStr)
+	// print("Picked ", gp.wasmfxContIndex, " to run next.\n")
+
 	// May be on a new P.
 	pp = mp.p.ptr()
 
@@ -4269,6 +4273,11 @@ func park_m(gp *g) {
 	// // debug_ofinterest := debug_gp.sched.sp
 	// print("park_m sees current g=", debug_thisg, ", current g's sp=", debug_thisg.sched.sp, ", debug_gp=", debug_gp, ", debug_gp's sp=", debug_gp.sched.sp, "\n")
 	// print("  argument g=", gp, ", its sp=", gp.sched.sp, "\n")
+
+	// // debugStr := "Suspending " + string(getg().wasmfxContIndex) + " (getg) or maybe " + string(gp.wasmfxContIndex) + " (gp).\n"
+	// // print(debugStr)
+	// // print("Suspending ", getg().wasmfxContIndex, " (getg) or maybe ", gp.wasmfxContIndex, " (gp).\n")
+	// print("Suspending ", gp.wasmfxContIndex, " (gp).\n")
 
 	mp := getg().m
 

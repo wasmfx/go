@@ -100,9 +100,7 @@ func jumpRISCV(word string) bool {
 }
 
 func jumpWasm(word string) bool {
-	return (word == "JMP" || word == "CALL" || word == "Call" || word == "Br" || word == "BrIf" ||
-		// AContNew is a "jump" in the sense that its argument is a function label.
-		word == "AContNew")
+	return word == "JMP" || word == "CALL" || word == "Call" || word == "Br" || word == "BrIf"
 }
 
 func archX86(linkArch *obj.LinkArch) *Arch {

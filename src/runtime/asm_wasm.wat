@@ -52,7 +52,7 @@
     (local.set $suspension)
     (table.set $contTable (local.get $g-index) (ref.null $ct1))  ;; if we come around on that g-index again, we should have a null which kicks in the invokinator instead.
 
-    (block $exit (result)
+    (block $exit (result)  ;; Can actually do loop or break, but need a way to exit eventually.
         ;; Call this continuation in a resume context with two handlers, $gogo and $scheduler.
         ;; The $gogo handler just stores the resulting continuation in an appropriate
         (block $gogo_handler (result)
@@ -126,13 +126,6 @@
     (local $debug1 i32)
     (local $debug2 i32)
 
-    ;; (global.get 0)
-    ;; (i64.extend_i32_s)
-    ;; (call $printNum)
-
-    ;; (i64.load (global.get 0))
-    ;; (call $printNum)
-
     (i32.load16_u (i32.sub (global.get $SP) (i32.const 8)))
     (local.tee $debug1)
     (i32.load offset=2 (i32.sub (global.get 0) (i32.const 8)))
@@ -163,3 +156,13 @@
 ;;  0x134fe6 | 0b          | end
 )
 
+
+;; ;; Wow: the AI wrote this just given the name.
+;; (func $deleteContinuation (export "deleteContinuation")
+;;   (local $g-index i32)
+;;   (global.get $g)
+;;   (i32.wrap_i64)
+;;   (i32.load offset=464)  ;; get wasmfxContIndex from g
+;;   (local.set $g-index)
+;;   (table.set $contTable (local.get $g-index) (ref.null $ct1))
+;; )

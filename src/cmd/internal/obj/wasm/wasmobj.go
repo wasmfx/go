@@ -1282,7 +1282,7 @@ func assemble(ctxt *obj.Link, s *obj.LSym, newprog obj.ProgAlloc) {
 			})
 
 		case ACall:
-			if (strings.Contains(ctxt.PosTable.Pos(p.Pos).String(), "asm_wasm.s")) {
+			if strings.Contains(ctxt.PosTable.Pos(p.Pos).String(), "asm_wasm.s") {
 			}
 			switch p.To.Type {
 			case obj.TYPE_CONST:
@@ -1380,22 +1380,22 @@ func assemble(ctxt *obj.Link, s *obj.LSym, newprog obj.ProgAlloc) {
 			w.WriteByte(0x0d)
 
 		case AContNew:
-			w.WriteByte(0x0d)  // HACKHACKHACK Hard-coded type index based on my example program.
+			w.WriteByte(0x0d) // HACKHACKHACK Hard-coded type index based on my example program.
 
 		case ASuspend:
 			writeUleb128(w, uint64(p.To.Offset))
 
 		case ASwitch:
 			// "switch" isn't presently used, but represents the start of a switch-based implementation.
-			w.WriteByte(0x0d)  // HACKHACKHACK Continuation type
-			w.WriteByte(0x00)  // Hard coded tag index.
+			w.WriteByte(0x0d) // HACKHACKHACK Continuation type
+			w.WriteByte(0x00) // Hard coded tag index.
 
 		case AResume:
-			w.WriteByte(0x0d)  // Continuation type index. HACKHACKHACK.
-			w.WriteByte(0x01)  // size of handler table
-			w.WriteByte(0x00)  // "on" clause with handler, not switch
-			w.WriteByte(0x00)  // tag 0 ->
-			w.WriteByte(0x00)  //   label 0  (hard-coded for the implementation in asm_wasm.s)
+			w.WriteByte(0x0d) // Continuation type index. HACKHACKHACK.
+			w.WriteByte(0x01) // size of handler table
+			w.WriteByte(0x00) // "on" clause with handler, not switch
+			w.WriteByte(0x00) // tag 0 ->
+			w.WriteByte(0x00) //   label 0  (hard-coded for the implementation in asm_wasm.s)
 
 		case AMemoryCopy:
 			w.WriteByte(0x00)

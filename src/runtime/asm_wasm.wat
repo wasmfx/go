@@ -112,7 +112,7 @@
         (local.get $g-index)
         (local.get $suspension)
         (table.set $contTable)
-        (i32.const 0)   ;; The PC_B for the call to $mcall0. Probably $mcall0 could be compiled w/o that convention but I don't know how.
+        (i32.const 0)   ;; The PC_B for the call to $morestack. Probably $morestack could be compiled w/o that convention but I don't know how.
         (call $morestack)  ;; is expected to suspend to the $gogo_handler
         (unreachable)
       )  ;; LABEL exit:

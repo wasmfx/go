@@ -212,14 +212,10 @@ func asmb2(ctxt *ld.Link, ldr *loader.Loader) {
 				wfn.Write(P[off:r.Off()])
 				off = r.Off()
 				rs := r.Sym()
-				// fmt.Printf("rs = %d\n", rs)
-				// fmt.Printf("rs = %s\n", ldr.SymName(rs))
 				switch r.Type() {
 				case objabi.R_ADDR:
-					// fmt.Printf("R_ADDR: %s + %d\n", ldr.SymName(rs), r.Add())
 					writeSleb128(wfn, ldr.SymValue(rs)+r.Add())
 				case objabi.R_CALL:
-					// fmt.Printf("R_CALL: %s + %d\n", ldr.SymName(rs), len(hostImports), ldr.SymValue(rs), funcValueOffset)
 					writeSleb128(wfn, int64(len(hostImports))+ldr.SymValue(rs)>>16-funcValueOffset)
 				case objabi.R_WASMIMPORT:
 					fmt.Printf("Doing relocation for R_WASMIMPORT: %s (#%d)\n", ldr.SymName(rs), rs)
@@ -481,7 +477,6 @@ func writeExportSec(ctxt *ld.Link, ldr *loader.Loader, lenHostImports int) {
 
 	switch buildcfg.GOOS {
 	case "wasip1":
-		// ldr.WasmExports = append(ldr.WasmExports, ldr.Lookup("wasm_pc_f_loop1", 0))
 		writeUleb128(ctxt.Out, uint64(7+len(ldr.WasmExports))) // number of exports
 		var entry, entryExpName string
 		switch ctxt.BuildMode {

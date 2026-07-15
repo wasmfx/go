@@ -432,7 +432,6 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte) {
 			} else {
 				st.err.Errorf(s, "missing .debug_addr index relocation target %s", ldr.SymName(rs))
 			}
-			// fmt.Printf("The o is %d\n", o)
 
 			// For these relocations we write a ULEB128, but using a
 			// cooked/hacked recipe that ensures the result has a

@@ -14,7 +14,6 @@ import (
 	"internal/abi"
 	"io"
 	"math"
-	"strings"
 )
 
 var Register = map[string]int16{
@@ -1282,8 +1281,6 @@ func assemble(ctxt *obj.Link, s *obj.LSym, newprog obj.ProgAlloc) {
 			})
 
 		case ACall:
-			if strings.Contains(ctxt.PosTable.Pos(p.Pos).String(), "asm_wasm.s") {
-			}
 			switch p.To.Type {
 			case obj.TYPE_CONST:
 				writeUleb128(w, uint64(p.To.Offset))

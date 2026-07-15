@@ -75,7 +75,6 @@ var wasmFuncTypes = map[string]*wasmFuncType{
 	"wasm_export_resume":      {Params: []byte{}},                                         //
 	"wasm_export_getsp":       {Results: []byte{I32}},                                     // sp
 	"wasm_pc_f_loop":          {Params: []byte{}},                                         //
-	"wasm_pc_f_loop1":         {Params: []byte{}},                                         //
 	"wasm_pc_f_loop_export":   {Params: []byte{I32}},                                      // pc_f
 	"runtime.wasmDiv":         {Params: []byte{I64, I64}, Results: []byte{I64}},           // x, y -> x/y
 	"runtime.wasmTruncS":      {Params: []byte{F64}, Results: []byte{I64}},                // x -> int(x)

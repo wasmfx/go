@@ -118,8 +118,8 @@ TEXT runtime·mcall(SB), NOSPLIT, $0-8
 		JMP runtime·badmcall(SB)
 	End
 
-    MOVD CTXT, g_sched+gobuf_mcallfn(g)  // For use of mcall0
-    MOVD R2, g_sched+gobuf_mcallg0(g)  // For use of mcall0
+	MOVD CTXT, g_sched+gobuf_mcallfn(g)  // For use of mcall0
+	MOVD R2, g_sched+gobuf_mcallg0(g)  // For use of mcall0
 
 	ASuspend 1  // tag $scheduler
 
@@ -144,8 +144,8 @@ TEXT runtime·mcall(SB), NOSPLIT, $0-8
 // was already captured and the stack that we go into from here is
 // ultimately thrown away (by a call to gogo).
 TEXT runtime·mcall0(SB), NOSPLIT, $0-8
-    MOVD g_sched+gobuf_mcallfn(g), CTXT
-    MOVD g_sched+gobuf_mcallg0(g), R2
+	MOVD g_sched+gobuf_mcallfn(g), CTXT
+	MOVD g_sched+gobuf_mcallg0(g), R2
 
 	// switch to g0's stack
 	I64Load (g_sched+gobuf_sp)(R2)

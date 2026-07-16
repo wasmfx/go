@@ -38,31 +38,27 @@
     ;; continuation of the previous goroutine, i.e. the one we are activating now.
     ;; So we want to capture the context of the current g now in order to store ITS
     ;; continuation after the jump.
-    (global.get $g) ;; get the global g structure
-    (i32.wrap_i64)
-    ;; (i32.load offset=448)  ;; get wasmfxContIndex from g
-    (i32.load offset=464)  ;; get wasmfxContIndex from g    ;; ... offset seems to have changed
-    (local.tee $g-index)
+    (loop $continue (result)
+        (global.get $g) ;; get the global g structure
+        (i32.wrap_i64)
+        ;; (i32.load offset=448)  ;; get wasmfxContIndex from g
+        (i32.load offset=464)  ;; get wasmfxContIndex from g    ;; ... offset seems to have changed
+        (local.tee $g-index)
 
-    (table.get $contTable)
-    ;; Note here we're setting $suspension to the immediate continuation that we
-    ;; are about to resume into, while at the resume handler we'll set it to the
-    ;; new continuation that was captured at the suspend site. These should
-    ;; correspond to successive suspensions of the same goroutine.
-    (local.set $suspension)
-    (table.set $contTable (local.get $g-index) (ref.null $ct1))  ;; if we come around on that g-index again, we should have a null which kicks in the invokinator instead.
+        (table.get $contTable)
+        (local.set $suspension)
+        (table.set $contTable (local.get $g-index) (ref.null $ct1))  ;; if we come around on that g-index again, we should have a null which kicks in the invokinator instead.
 
-    (block $exit (result)  ;; Can actually do loop or break, but need a way to exit eventually.
         ;; Call this continuation in a resume context with two handlers, $gogo and $scheduler.
         ;; The $gogo handler just stores the resulting continuation in an appropriate
         (block $gogo_handler (result)
             (try_table (result) (catch $exit-scheduler-exn $gogo_handler)
-               (call $scheduler_context (local.get $g-index) (local.get $suspension))
+                (call $scheduler_context (local.get $g-index) (local.get $suspension))
             )
         )  ;; LABEL gogo_handler:
-        (br $exit)
+        ;; (br_if $continue (i32.eqz (global.get 7)))  ;; TODO: Check the PAUSE global
+        (br $continue)
     )
-    ;; LABEL exit:
 
     ;; the wrapper function generated for resuminator will pop the stack for us.
     ;; Which is not what we want! So we decrement the stack here to offset what the

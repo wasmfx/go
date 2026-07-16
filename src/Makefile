@@ -19,3 +19,12 @@ $(ASM_WASM_FILE).wasm: $(ASM_WASM_FILE).wat
 
 %-baseline.wasm: %.go
 	GOTOOLCHAIN=local GOOS=wasip1 GOARCH=wasm $(BASELINE_GO) build -o $@ $<
+
+%.js.wasm: %.pre.js.wasm $(ASM_WASM_FILE).wasm
+	$(WASM_MERGE) $(@:.js.wasm=.pre.js.wasm) "main" $(ASM_WASM_FILE).wasm "wasmfx" -o $@
+
+%.pre.js.wasm: %.go
+	GOOS=js GOARCH=wasm /go/bin/go build -o $@ $<
+
+%-baseline.js.wasm: %.go
+	GOTOOLCHAIN=local GOOS=js GOARCH=wasm $(BASELINE_GO) build -o $@ $<

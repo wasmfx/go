@@ -40,3 +40,9 @@ func readRandom(r []byte) int {
 func goenvs() {
 	goenvs_unix()
 }
+
+//go:wasmimport wasmfx resuminator
+func resuminator()
+
+//go:wasmimport wasmfx exit_scheduler
+func exit_scheduler()

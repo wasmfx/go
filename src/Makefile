@@ -1,5 +1,6 @@
-BINARYEN?=/opt/wasmfx/binaryenfx
-WASM_INTERP?=/opt/wasmfx/specfx/interpreter/wasm
+ROOT?=/opt/wasmfx
+BINARYEN?=$(ROOT)/binaryen
+WASM_INTERP?=$(ROOT)/stack-switching/interpreter/wasm
 WASM_MERGE=$(BINARYEN)/bin/wasm-merge --enable-nontrapping-float-to-int --enable-multimemory --enable-exception-handling --enable-reference-types --enable-multivalue --enable-bulk-memory --enable-gc --enable-stack-switching
 
 BASELINE_GO=/usr/lib/go-1.25/bin/go

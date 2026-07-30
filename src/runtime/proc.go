@@ -4544,6 +4544,12 @@ func gdestroy(gp *g) {
 	gp.bubble = nil
 	gp.fipsOnlyBypass = false
 	gp.secret = 0
+	// Setting the continuation index to something we know is not used. TODO:
+	// Actually we shouldn't keep leaking slots in that table and we need a way
+	// to recycle slots that have already been used. Oh, besides the *slots*, we
+	// are leaving no-use continuations in place in the table, which prevents
+	// the GC from reclaiming those.
+	gp.wasmfxContIndex = nextContIndex.Add(1)
 
 	if gcBlackenEnabled != 0 && gp.gcAssistBytes > 0 {
 		// Flush assist credit to the global pool. This gives
@@ -5331,8 +5337,9 @@ func malg(stacksize int32) *g {
 		// there on gsignal stack during VDSO on ARM and ARM64.
 		*(*uintptr)(unsafe.Pointer(newg.stack.lo)) = 0
 	}
+	// TODO: Note we're never reusing cont index slots, but we will have to.
 	newg.wasmfxContIndex = nextContIndex.Add(1)
-	// print("set wasmfxContIndex to ", newg.wasmfxContIndex, "\n")
+	// print("malg, set wasmfxContIndex to ", newg.wasmfxContIndex, "\n")
 	return newg
 }
 
@@ -5369,6 +5376,8 @@ func newproc1(fn *funcval, callergp *g, callerpc uintptr, parked bool, waitreaso
 		newg = malg(stackMin)
 		casgstatus(newg, _Gidle, _Gdead)
 		allgadd(newg) // publishes with a g->status of Gdead so GC scanner doesn't look at uninitialized stack.
+	} else {
+		// print("Using recycled g record, ContIndex is ", newg.wasmfxContIndex, "\n")
 	}
 	if newg.stack.hi == 0 {
 		throw("newproc1: newg missing stack")

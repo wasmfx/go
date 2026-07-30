@@ -99,7 +99,7 @@
         ;; Push the PC_B for the call to $mcall0, namely 0. Probably $mcall0 could be compiled
         ;; w/o that convention but I don't know how.
         (i32.const 0)
-        (call $mcall0)  ;; is expected to suspend to the $gogo_handler
+        (call $mcall0)  ;; is expected to throw to the $gogo_handler
         (unreachable)
         )  ;; LABEL more-stack-handler:
         (local.set $suspension)
@@ -113,7 +113,7 @@
         ;; Push the PC_B for the call to $morestack, namely 0. Probably $morestack could be
         ;; compiled w/o that convention but I don't know how.
         (i32.const 0)
-        (call $morestack)  ;; is expected to suspend to the $gogo_handler
+        (call $morestack)  ;; is expected to throw to the $gogo_handler
         (unreachable)
       )  ;; LABEL exit:
       (return)

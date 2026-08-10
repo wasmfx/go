@@ -39,9 +39,7 @@ TEXT ·checkASM(SB), NOSPLIT, $0-1
 
 TEXT runtime·gogo(SB), NOSPLIT, $0-8
 	// buf+0(FP) (==8(SP)) is the function argument, which is a gobuf data structure.
-	// It identifies the new g. The current g is I guess in the global, g (global1 in Wasm)
-	// I think we will have to save the outgoing g somewhere so that the resuminator can take
-	// the suspended continuation and store it in that
+	// It identifies the new g. The current g is I guess in the global, g (global $1 in Wasm)
 
 	// Move the prior g into a local so that we can restore it after suspend.
 	// will also need its SP.
@@ -61,7 +59,8 @@ TEXT runtime·gogo(SB), NOSPLIT, $0-8
 	I64Store $0
 
 	MOVD gobuf_ctxt(R0), CTXT
-	// Not sure what should happen here. I found this was clobbering some stack pointers that I needed later.
+	// Not sure what should happen here with gobuf_sp. I found this was
+	// clobbering some stack pointers that I needed later.
 	// Revisit this.
 	// // clear to help garbage collector
 	// MOVD $0, gobuf_sp(R0)
@@ -70,7 +69,8 @@ TEXT runtime·gogo(SB), NOSPLIT, $0-8
 	// Argh: The first time through gogo, it's called outside of the context of
 	// wasm_pc_f_loop, and we can't suspend. So fall through with the old
 	// method. Use RET3 as a kludgy global to track whether we're in the first
-	// call or a subsequent one.
+	// call or a subsequent one. We will want a better way to handle that first
+	// entry into gogo.
 	Get RET3
 	I64Eqz
 	If
@@ -97,12 +97,17 @@ TEXT runtime·gogo(SB), NOSPLIT, $0-8
 // Switch to m->g0's stack, call fn(g).
 // Fn must never return. It should gogo(&g->sched)
 // to keep running g.
+//
+// With stack-switching extension, this now causes a "suspend" to capture the stack as of the call to mcall.
+// The handler (in  asm_wasm.wat) that it suspends to will store the continuation and call mcall0. We can
+// think of mcall0 as simply the "part of mcall which happens in the machine stack." The stack context of
+// mcall0 will ultimately be thrown away, but the context of the call to mcall is that one that is preserved.
 TEXT runtime·mcall(SB), NOSPLIT, $0-8
 	// CTXT = fn
 	MOVD fn+0(FP), CTXT
 	// R1 = g.m
 	MOVD g_m(g), R1
-	// R2 = g0
+	// R2 = g.m.g0
 	MOVD m_g0(R1), R2
 	MOVD g, R3
 
@@ -118,15 +123,21 @@ TEXT runtime·mcall(SB), NOSPLIT, $0-8
 		JMP runtime·badmcall(SB)
 	End
 
+    // Since we split parts of mcall into mcall0, we need to save the context
+    // somewhere mcall0 can find it. I decided to use new fields in gobuf for
+    // that, mcallfn and mcallg0, although with reflection I think some Wasm
+    // globals could be used if we choose. Also we can optimize: The assignments to
+    // CTXT and R2 above could assign to the ultimate destination instead.
 	MOVD CTXT, g_sched+gobuf_mcallfn(g)  // For use of mcall0
 	MOVD R2, g_sched+gobuf_mcallg0(g)  // For use of mcall0
 
-	ASuspend 1  // tag $scheduler
+	ASuspend 1  // Hardcoding tag 1 == $scheduler
 
-	// THIS IS WHERE WE NEED THE SP RESTORATION
+	// After suspending, need to restore the shadow stack pointer to the resumed g's stack.
 	MOVD g_sched+gobuf_sp(R3), SP
 
-	// Useless rigamarole just to keep mcall0 from being removed
+	// The following dead code is just to keep mcall0 from being
+	// removed during linking. There's probably a better way.
 	I32Const 1
 	I32Eqz
 	If
@@ -154,10 +165,10 @@ TEXT runtime·mcall0(SB), NOSPLIT, $0-8
 	I32WrapI64
 	Set SP
 
-	// set arg to current g
+	// set fn's arg to current g
 	MOVD g, 0(SP)
 
-	// switch to g0
+	// switch to the g0 stashed by mcall, which was originally in g.m.g0.
 	MOVD R2, g
 
 	// call fn
@@ -165,6 +176,7 @@ TEXT runtime·mcall0(SB), NOSPLIT, $0-8
 	I32WrapI64
 	I64Load $0
 	CALL
+	// The above not expected to return.
 
 	Get SP
 	I32Const $8
@@ -352,9 +364,9 @@ TEXT runtime·morestack_noctxt(SB),NOSPLIT,$0
 
 	MOVD g, R3
 
-	ASuspend 2  // tag $more-stack-tag
+	ASuspend 2  // Suspend on tag 2 == $more-stack-tag
 
-	// THIS IS WHERE WE NEED THE SP RESTORATION
+	// After suspending, need to restore the shadow stack pointer to the resumed g's stack.
 	MOVD g_sched+gobuf_sp(R3), SP
 
 	Get SP

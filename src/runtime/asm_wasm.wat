@@ -41,13 +41,17 @@
     (loop $continue (result)
         (global.get $g) ;; get the global g structure
         (i32.wrap_i64)
-        ;; (i32.load offset=448)  ;; get wasmfxContIndex from g
-        (i32.load offset=464)  ;; get wasmfxContIndex from g    ;; ... offset seems to have changed
+        (i32.load offset=464)  ;; get wasmfxContIndex from g. 464 is the offset in the structure; fragile, obviously.
         (local.tee $g-index)
 
         (table.get $contTable)
         (local.set $suspension)
-        (table.set $contTable (local.get $g-index) (ref.null $ct1))  ;; if we come around on that g-index again, we should have a null which kicks in the invokinator instead.
+        ;; Set the current goroutine's continuation table entry to null.
+        ;; If we come around on that g-index again, the null will
+        ;; trigger the invokinator instead of the resume. This will happen if there are
+        ;; codepaths in the runtime that set the function return value to 1 but
+        ;; which haven't been integrated with the new suspend/resume code.
+        (table.set $contTable (local.get $g-index) (ref.null $ct1))
 
         ;; Call this continuation in a resume context with two handlers, $gogo and $scheduler.
         ;; The $gogo handler just stores the resulting continuation in an appropriate
@@ -60,7 +64,7 @@
         (br $continue)
     )
 
-    ;; the wrapper function generated for resuminator will pop the stack for us.
+    ;; The wrapper function generated for resuminator will pop the stack for us.
     ;; Which is not what we want! So we decrement the stack here to offset what the
     ;; wrapper will do.
     (global.get 0)
@@ -69,10 +73,13 @@
     (global.set 0)
   )
 
-  ;; Misnomer: This function is now actually the resume handler, and "resuminator" is actually the stack frame that holds the scheduler context. TODO: switch them
+  ;; Misnomer: This function is now actually the resume handler, and "resuminator"
+  ;; "resuminator" is actually the stack frame that holds the scheduler context.
+  ;; TODO: switch them
+  
   (func $scheduler_context (param $g-index i32) (param $suspension (ref null $ct1)) (result)
-      ;;(call $printNum (i64.extend_i32_u (local.get $g-index)))
-      ;; Call the nominated continuation (in $suspension) or if we don't have one, use invokinator to start something based on pc_f/pc_b.
+      ;; Call the nominated continuation (in $suspension) or if we don't have
+      ;; one, use invokinator to start something based on pc_f/pc_b.
       (if (ref.is_null (local.get $suspension))
         (then
           (local.set $suspension (cont.new $ct1 (ref.func $invokinator))))
@@ -81,6 +88,10 @@
         (block $more-stack-handler (result (ref null $ct1))
         (block $scheduler_handler (result (ref null $ct1))
           (resume $ct1
+            ;; Note: The two handlers do almost the same thing, but one carries on by calling mcall0 and the other calls morestack.
+            ;; Before stack-switching, those runtime functions had their own cheap way of capturing the stack, and simply carried
+            ;; on with their own work (mcall0 or morestack). Now we need to use the suspend instruction to capture the stack, and
+            ;; a corresponding handler to do whatever we were going to do next.
             (on $scheduler $scheduler_handler)
             (on $more-stack-tag $more-stack-handler)
             (local.get $suspension))
@@ -97,10 +108,12 @@
         (table.set $contTable)
 
         ;; Push the PC_B for the call to $mcall0, namely 0. Probably $mcall0 could be compiled
-        ;; w/o that convention but I don't know how.
+        ;; w/o that convention but I don't know how. Anyway we plan to eliminate PC_B as a 
+        ;; calling convention.
         (i32.const 0)
-        (call $mcall0)  ;; is expected to throw to the $gogo_handler
+        (call $mcall0)  ;; is expected to throw to the $gogo_handler (using the $exit_scheduler exception tag).
         (unreachable)
+
         )  ;; LABEL more-stack-handler:
         (local.set $suspension)
         ;; store the continuation at the outgoing groutine's index in the continuation table.
@@ -111,9 +124,10 @@
         (local.get $suspension)
         (table.set $contTable)
         ;; Push the PC_B for the call to $morestack, namely 0. Probably $morestack could be
-        ;; compiled w/o that convention but I don't know how.
+        ;; compiled w/o that convention but I don't know how. Anyway we plan to eliminate PC_B
+        ;; as a calling convention.
         (i32.const 0)
-        (call $morestack)  ;; is expected to throw to the $gogo_handler
+        (call $morestack)  ;; is expected to throw to the $gogo_handler (using the $exit_scheduler exception tag).
         (unreachable)
       )  ;; LABEL exit:
       (return)
@@ -125,6 +139,12 @@
   (func $exit_scheduler (export "exit_scheduler")
     (throw $exit-scheduler-exn))
 
+  ;; Invoke a function using PC_F & PC_B from the current stack pointer. This is
+  ;; used when starting a new goroutine, or if the old control flow is triggered
+  ;; (returning 1 from a function, without hitting mcall and using its `suspend`.)
+  ;; The "old control flow" path is intended to be removed someday, along with
+  ;; PC_B, but there will may always be a need for a generic stub that can start
+  ;; any goroutine.
   (func $invokinator (export "invokinator")
     (local $debug1 i32)
     (local $debug2 i32)

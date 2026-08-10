@@ -37,7 +37,6 @@ func runsum(n int32) {
 }
 
 func main() {
-	print("hi\n") // Confirms we get running, vs dying in the process startup.
 	first, err := strconv.Atoi(os.Args[1])
 	if err != nil {
 		panic("arg not parsed as int32")
@@ -47,11 +46,18 @@ func main() {
 		panic("arg not parsed as int32")
 	}
 
-	// Jump in increments of 1000 so we get some interestingly different timing data.
-	for i := int32(first); i <= int32(last); i += 1000 {
+	increment := 1000
+	if len(os.Args) == 4 {
+		increment, err = strconv.Atoi(os.Args[3])
+		if err != nil {
+			panic("arg not parsed as int32")
+		}
+	}
+
+	for i := int32(first); i <= int32(last); i += int32(increment) {
 		start := time.Now()
 		runsum(i)
-		fmt.Println(i)
+		fmt.Println("Benchmark size: ", i)
 		fmt.Println("Time: ", time.Since(start))
 	}
 }

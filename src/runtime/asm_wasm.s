@@ -614,7 +614,7 @@ TEXT wasm_pc_f_loop(SB),NOSPLIT,$0
 	loop:
 		Loop
 			I32Const $0  // HACK: unnecessary
-			Call runtime·resuminator(SB)
+			Call runtime·scheduler_context(SB)
 			Drop
 
 			Get PAUSE

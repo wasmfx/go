@@ -267,10 +267,10 @@ func nanotime1() int64 {
 	return int64(time)
 }
 
-// TODO: This does not suffice to get resuminator defined as a wasmimport.
+// TODO: This does not suffice to get scheduler_context defined as a wasmimport.
 //
-//go:wasmimport wasmfx resuminator
-func resuminator()
+//go:wasmimport wasmfx scheduler_context
+func scheduler_context()
 
 //go:wasmimport wasmfx exit_scheduler
 func exit_scheduler()

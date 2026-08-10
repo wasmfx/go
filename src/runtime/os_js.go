@@ -41,8 +41,8 @@ func goenvs() {
 	goenvs_unix()
 }
 
-//go:wasmimport wasmfx resuminator
-func resuminator()
+//go:wasmimport wasmfx scheduler_context
+func scheduler_context()
 
 //go:wasmimport wasmfx exit_scheduler
 func exit_scheduler()

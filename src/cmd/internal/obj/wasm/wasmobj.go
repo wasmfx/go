@@ -769,7 +769,7 @@ func genWasmImportWrapper(s *obj.LSym, appendp func(p *obj.Prog, as obj.As, args
 	// indicates that the called function understands the Go stack-based call convention
 	// so we just pass the stack pointer to it, knowing it will read the params directly
 	// off the stack and push the results into memory based on the stack pointer.
-	if wi.Module == GojsModule || wi.Name == "resuminator" {
+	if wi.Module == GojsModule || wi.Name == "scheduler_context" {
 		fmt.Println("  Generating wrapper the simple way")
 
 		// The called function has a signature of 'func(sp int)'. It has access to the memory
@@ -1289,8 +1289,8 @@ func assemble(ctxt *obj.Link, s *obj.LSym, newprog obj.ProgAlloc) {
 					panic("bad name for Call")
 				}
 				typ := objabi.R_CALL
-				// TODO: somehow mark the resuminator call with WasmImport.
-				if p.Mark&WasmImport != 0 || p.To.Sym.Name == "resuminator" {
+				// TODO: somehow mark the scheduler_context call with WasmImport.
+				if p.Mark&WasmImport != 0 || p.To.Sym.Name == "scheduler_context" {
 					typ = objabi.R_WASMIMPORT
 				}
 				rel := obj.Reloc{

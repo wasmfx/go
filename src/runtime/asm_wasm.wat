@@ -24,47 +24,53 @@
   (export "more-stack-tag" (tag $more-stack-tag))
   ;; (export "exit-scheduler" (tag $exit-scheduler))
   (elem declare func $invokinator)
-  (elem declare func $scheduler_context)
+  (elem declare func $resuminator)
 
-  ;; Misnomer: This function is now actually the scheduler-context, and the one by that name is the resume handler.
-  (func $resuminator (export "resuminator") (param) (result)
+  ;; This is the outermost trampoline, effectively replacing wasm_pc_f_loop. It
+  ;; knows how to find and invoke a current continuation from the global g, or
+  ;; dispatch based on a function index if there is no saved continuation.
+  ;; Crucially, it also sets up a "scheduler context", namely a stack frame that
+  ;; the scheduler can quickly exit to by throwing an exception (runtime.gogo does so).
+  ;;
+  ;; Note: resuminator is separated out conceptually, but it is only called from
+  ;; here and could be inlined into scheduler_context.
+  (func $scheduler_context (export "scheduler_context") (param) (result)
     (local $suspension (ref null $ct1))
     (local $g-index i32)  ;; this is the index of the prior g, which will tell us where to store the suspension that is created when a goroutine hits the scheduler code (mcall).
 
-    ;; Fetch the current g's wasmFxContIndex for use when we do table.set later.
-    ;; We want the g object that we're coming in on. When we are suspended to the
-    ;; resume handler, the global g will be the new target g as set by
-    ;; runtime.gogo. But the continuation passed to that point will be the
-    ;; continuation of the previous goroutine, i.e. the one we are activating now.
-    ;; So we want to capture the context of the current g now in order to store ITS
-    ;; continuation after the jump.
     (loop $continue (result)
-        (global.get $g) ;; get the global g structure
+        ;; Get the wasmfxContIndex from the global g structure.
+        (global.get $g)
         (i32.wrap_i64)
         (i32.load offset=464)  ;; get wasmfxContIndex from g. 464 is the offset in the structure; fragile, obviously.
         (local.tee $g-index)
 
         (table.get $contTable)
         (local.set $suspension)
-        ;; Set the current goroutine's continuation table entry to null.
-        ;; If we come around on that g-index again, the null will
-        ;; trigger the invokinator instead of the resume. This will happen if there are
-        ;; codepaths in the runtime that set the function return value to 1 but
-        ;; which haven't been integrated with the new suspend/resume code.
+
+        ;; Set the current goroutine's continuation table entry to null. We don't want
+        ;; to reinvoke that continuation, which is a runtime error.
+        ;;
+        ;; Presently, with PC_B/PC_F flow still in place, if we come around on
+        ;; that g-index again, the null will trigger the invokinator instead of
+        ;; the resume, which works fine. And this will happen if there are codepaths
+        ;; in the runtime that set the function return value to 1 but which
+        ;; haven't been integrated with the new suspend/resume code.
         (table.set $contTable (local.get $g-index) (ref.null $ct1))
 
-        ;; Call this continuation in a resume context with two handlers, $gogo and $scheduler.
-        ;; The $gogo handler just stores the resulting continuation in an appropriate
         (block $gogo_handler (result)
             (try_table (result) (catch $exit-scheduler-exn $gogo_handler)
-                (call $scheduler_context (local.get $g-index) (local.get $suspension))
+                (call $resuminator (local.get $g-index) (local.get $suspension))
             )
         )  ;; LABEL gogo_handler:
-        ;; (br_if $continue (i32.eqz (global.get 7)))  ;; TODO: Check the PAUSE global
+        ;; (br_if $continue (i32.eqz (global.get $PAUSE)))  ;; TODO: Check the PAUSE global (7)
+
+        ;; Unconditionally loop around for now. Note that normal program exit happens through
+        ;; a WASI call to proc_exit, not by returning through here.
         (br $continue)
     )
 
-    ;; The wrapper function generated for resuminator will pop the stack for us.
+    ;; The wrapper function generated for scheduler_context will pop the stack for us.
     ;; Which is not what we want! So we decrement the stack here to offset what the
     ;; wrapper will do.
     (global.get 0)
@@ -73,11 +79,11 @@
     (global.set 0)
   )
 
-  ;; Misnomer: This function is now actually the resume handler, and "resuminator"
-  ;; "resuminator" is actually the stack frame that holds the scheduler context.
-  ;; TODO: switch them
-  
-  (func $scheduler_context (param $g-index i32) (param $suspension (ref null $ct1)) (result)
+  ;; Resuminator sets up suspension handlers for the scheduler and morestack,
+  ;; and then calls the continuation that was passed in. If there is no
+  ;; continuation, it calls invokinator to start a new goroutine based on the PC_F
+  ;; and PC_B values on the stack.
+  (func $resuminator (param $g-index i32) (param $suspension (ref null $ct1)) (result)
       ;; Call the nominated continuation (in $suspension) or if we don't have
       ;; one, use invokinator to start something based on pc_f/pc_b.
       (if (ref.is_null (local.get $suspension))

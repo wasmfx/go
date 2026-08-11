@@ -528,9 +528,6 @@ func acquireSudog() *sudog {
 
 //go:nosplit
 func releaseSudog(s *sudog) {
-	if s == nil {
-		throw("got nil s")
-	}
 	if s.elem.get() != nil {
 		throw("runtime: sudog with non-nil elem")
 	}
@@ -3391,7 +3388,6 @@ func execute(gp *g, inheritTime bool) {
 		traceRelease(trace)
 	}
 
-	// print("In execute, gonna gogo ", gp.wasmfxContIndex, "\n")
 	gogo(&gp.sched)
 }
 
@@ -4176,10 +4172,6 @@ top:
 
 	gp, inheritTime, tryWakeP := findRunnable() // blocks until work is available
 
-	// // debugStr := "Picked " + string(gp.wasmfxContIndex) + " to run next.\n"
-	// // print(debugStr)
-	// print("Picked ", gp.wasmfxContIndex, " to run next.\n")
-
 	// May be on a new P.
 	pp = mp.p.ptr()
 
@@ -4268,8 +4260,6 @@ func parkunlock_c(gp *g, lock unsafe.Pointer) bool {
 
 // park continuation on g0.
 func park_m(gp *g) {
-	// print("Suspending ", gp.wasmfxContIndex, " (gp).\n")
-
 	mp := getg().m
 
 	trace := traceAcquire()
@@ -4518,6 +4508,10 @@ func goexit0(gp *g) {
 	gdestroy(gp)
 	schedule()
 }
+
+// Continuations in wasm are indexed in a table by this counter. Each active
+// goroutine needs a unique index at which to store its current continuation.
+var nextContIndex atomic.Int32
 
 func gdestroy(gp *g) {
 	mp := getg().m
@@ -5318,8 +5312,6 @@ func syscall_runtime_AfterExec() {
 	execLock.unlock()
 }
 
-var nextContIndex atomic.Int32
-
 // Allocate a new g, with a stack big enough for stacksize bytes.
 func malg(stacksize int32) *g {
 	newg := new(g)
@@ -5339,7 +5331,6 @@ func malg(stacksize int32) *g {
 	}
 	// TODO: Note we're never reusing cont index slots, but we will have to.
 	newg.wasmfxContIndex = nextContIndex.Add(1)
-	// print("malg, set wasmfxContIndex to ", newg.wasmfxContIndex, "\n")
 	return newg
 }
 

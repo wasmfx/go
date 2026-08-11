@@ -664,10 +664,7 @@ func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool)
 	if c.bubble != nil {
 		reason = waitReasonSynctestChanReceive
 	}
-	//print(".mysg = ", mysg, "\n")
-	// This is where the context switch will happen.
 	gopark(chanparkcommit, unsafe.Pointer(&c.lock), reason, traceBlockChanRecv, 2)
-	//print("!mysg = ", mysg, "\n")
 
 	// someone woke us up
 	if mysg != gp.waiting {

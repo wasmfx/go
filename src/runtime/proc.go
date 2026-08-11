@@ -531,24 +531,24 @@ func releaseSudog(s *sudog) {
 	if s == nil {
 		throw("got nil s")
 	}
-	// if s.elem.get() != nil {
-	// 	throw("runtime: sudog with non-nil elem")
-	// }
-	// if s.isSelect {
-	// 	throw("runtime: sudog with non-false isSelect")
-	// }
-	// if s.next != nil {
-	// 	throw("runtime: sudog with non-nil next")
-	// }
-	// if s.prev != nil {
-	// 	throw("runtime: sudog with non-nil prev")
-	// }
-	// if s.waitlink != nil {
-	// 	throw("runtime: sudog with non-nil waitlink")
-	// }
-	// if s.c.get() != nil {
-	// 	throw("runtime: sudog with non-nil c")
-	// }
+	if s.elem.get() != nil {
+		throw("runtime: sudog with non-nil elem")
+	}
+	if s.isSelect {
+		throw("runtime: sudog with non-false isSelect")
+	}
+	if s.next != nil {
+		throw("runtime: sudog with non-nil next")
+	}
+	if s.prev != nil {
+		throw("runtime: sudog with non-nil prev")
+	}
+	if s.waitlink != nil {
+		throw("runtime: sudog with non-nil waitlink")
+	}
+	if s.c.get() != nil {
+		throw("runtime: sudog with non-nil c")
+	}
 	gp := getg()
 	if gp.param != nil {
 		throw("runtime: releaseSudog with non-nil gp.param")

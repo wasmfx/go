@@ -1290,8 +1290,7 @@ func assemble(ctxt *obj.Link, s *obj.LSym, newprog obj.ProgAlloc) {
 					panic("bad name for Call")
 				}
 				typ := objabi.R_CALL
-				// TODO: somehow mark the scheduler_context call with WasmImport.
-				if p.Mark&WasmImport != 0 || p.To.Sym.Name == "scheduler_context" {
+				if p.Mark&WasmImport != 0 {
 					typ = objabi.R_WASMIMPORT
 				}
 				rel := obj.Reloc{

@@ -95,6 +95,7 @@ TEXT runtime·gogo(SB), NOSPLIT, $0-8
 		MOVD g_sched+gobuf_ctxt(g), CTXT // TODO: was SP actually stored? do we need to store it somewhere?
 	End
 
+    // TODO: This "return unwind" is no longer needed now that exit_scheduler jumps away and never comes back.
 	I32Const $1
 	Return
 
@@ -628,6 +629,8 @@ TEXT wasm_pc_f_loop(SB),NOSPLIT,$0
 // to that PC in a normal return (not unwinding).
 // This is for handling an wasmexport function when it needs to switch the
 // stack.
+//
+// TODO(Ezra Cooper): I haven't updated this to match wasm_pc_f_loop.
 TEXT wasm_pc_f_loop_export(SB),NOSPLIT,$0
 	Get PAUSE
 	I32Eqz
@@ -682,7 +685,7 @@ TEXT runtime·pause(SB), NOSPLIT, $0-8
 	MOVD newsp+0(FP), SP
 	I32Const $1
 	Set PAUSE
-	RETUNWIND
+	RETUNWIND   // TODO(Ezra Cooper): Note use of RETUNWIND. Need to convert to WasmFX.
 
 // Called if a wasmexport function is called before runtime initialization
 TEXT runtime·notInitialized(SB), NOSPLIT, $0

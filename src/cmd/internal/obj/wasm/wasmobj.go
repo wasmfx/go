@@ -533,6 +533,7 @@ func preprocess(ctxt *obj.Link, s *obj.LSym, newprog obj.ProgAlloc) {
 			p = appendp(p, AI32Add)
 			p = appendp(p, ASet, regAddr(REG_SP))
 
+			// TODO(Ezra Cooper): RETUNWIND is not handled as a WasmFX instruction; it should be.
 			if ret.As == ARETUNWIND {
 				// function needs to unwind the WebAssembly stack, return 1
 				p = appendp(p, AI32Const, constAddr(1))

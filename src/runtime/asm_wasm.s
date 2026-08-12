@@ -23,6 +23,11 @@ TEXT runtime·rt0_go(SB), NOSPLIT|NOFRAME|TOPFRAME, $0
 	MOVD $runtime·mainPC(SB), 0(SP)
 	CALLNORESUME runtime·newproc(SB)
 	CALL runtime·mstart(SB) // WebAssembly stack will unwind when switching to another goroutine
+
+	// Just here to mark mcall0 as alive, preventing its removal.
+	I32Const $runtime·mcall0(SB)
+	Drop
+
 	UNDEF
 
 TEXT runtime·mstart(SB),NOSPLIT|TOPFRAME,$0
@@ -135,16 +140,6 @@ TEXT runtime·mcall(SB), NOSPLIT, $0-8
 
 	// After suspending, need to restore the shadow stack pointer to the resumed g's stack.
 	MOVD g_sched+gobuf_sp(R3), SP
-
-	// The following dead code is just to keep mcall0 from being
-	// removed during linking. There's probably a better way.
-	I32Const 1
-	I32Eqz
-	If
-		I32Const 1
-		Call runtime·mcall0(SB)
-		Drop
-	End
 
 	I32Const 0
 	Return
